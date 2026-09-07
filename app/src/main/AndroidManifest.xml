@@ -26,5 +26,14 @@
         <receiver
             android:name=".rappels.RecepteurRappel"
             android:exported="false" />
+
+        <receiver
+            android:name=".rappels.RecepteurActionPrise"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="fr.pillulier.app.PRIS" />
+                <action android:name="fr.pillulier.app.PLUS_TARD" />
+            </intent-filter>
+        </receiver>
     </application>
 </manifest>
