@@ -109,6 +109,7 @@ class AlarmeViewModelTest {
             LocalDateTime.of(2026, 1, 5, 8, 15),
             programmateur.programmees.single().quand,
         )
+        assertTrue(programmateur.programmees.single().critique, "une prise critique reportee reste critique")
         assertTrue(vue.etat.value.termine)
     }
 }

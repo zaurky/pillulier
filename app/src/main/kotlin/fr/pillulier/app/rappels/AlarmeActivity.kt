@@ -16,6 +16,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -47,7 +48,9 @@ class AlarmeActivity : ComponentActivity() {
         setContent {
             val etat by vue.etat.collectAsStateWithLifecycle()
 
-            if (etat.termine) finish()
+            LaunchedEffect(etat.termine) {
+                if (etat.termine) finish()
+            }
 
             MaterialTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
