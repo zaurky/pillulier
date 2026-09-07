@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -36,7 +37,10 @@ fun AutorisationsEcran(surTermine: () -> Unit) {
     ) { }
 
     Column(
-        modifier = Modifier.fillMaxWidth().padding(24.dp),
+        // Hors d'un `Scaffold`, personne ne consomme les encarts système : sans
+        // ce rembourrage le titre passerait sous la barre d'état, et c'est le
+        // premier écran que voit un nouvel utilisateur.
+        modifier = Modifier.fillMaxWidth().safeDrawingPadding().padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Text("Autorisations", style = MaterialTheme.typography.headlineSmall)

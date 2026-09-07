@@ -85,6 +85,16 @@ class AlarmeViewModelTest {
     }
 
     @Test
+    fun `un medicament disparu termine l alarme au lieu de l afficher vide`() = runTest {
+        // Rien n'est inséré : le médicament a été supprimé entre l'armement de
+        // l'alarme et son déclenchement.
+        vue.charger(cle, dose = 1.0)
+
+        assertTrue(vue.etat.value.termine, "une alarme sans cible doit se fermer")
+        assertEquals("", vue.etat.value.nom)
+    }
+
+    @Test
     fun `valider enregistre la prise annule l alarme et termine`() = runTest {
         insererInsuline()
         vue.charger(cle, dose = 1.0)

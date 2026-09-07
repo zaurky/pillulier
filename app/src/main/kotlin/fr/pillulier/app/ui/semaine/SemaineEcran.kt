@@ -15,11 +15,14 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import fr.pillulier.app.ui.libelleMoment
+import fr.pillulier.app.ui.libelleStatut
 import fr.pillulier.domain.Moment
 import fr.pillulier.domain.StatutPrise
 import java.time.format.DateTimeFormatter
@@ -68,9 +71,16 @@ fun SemaineEcran(vue: SemaineViewModel = hiltViewModel()) {
                     etat.jours.forEach { jour ->
                         Column(modifier = Modifier.width(96.dp).padding(4.dp)) {
                             etat.cellules[jour to moment].orEmpty().forEach { entree ->
+                                // Le marqueur porte toute l'information de la
+                                // grille et reste muet pour un lecteur d'écran :
+                                // on lui substitue le statut en mots.
                                 Text(
                                     "${marqueur(entree.statut)} ${entree.nom}",
                                     style = MaterialTheme.typography.bodySmall,
+                                    modifier = Modifier.semantics {
+                                        contentDescription =
+                                            "${entree.nom} — ${libelleStatut(entree.statut)}"
+                                    },
                                 )
                             }
                         }

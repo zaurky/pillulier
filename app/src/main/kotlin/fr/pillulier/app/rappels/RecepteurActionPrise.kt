@@ -3,6 +3,7 @@ package fr.pillulier.app.rappels
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.util.Log
 import dagger.hilt.android.AndroidEntryPoint
 import fr.pillulier.app.data.DepotMedicaments
 import fr.pillulier.app.data.DepotPreferences
@@ -12,6 +13,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+
+private const val ETIQUETTE = "RecepteurActionPrise"
 
 /** Traite les deux actions d'une notification de rappel : *Pris* et *Plus tard*. */
 @AndroidEntryPoint
@@ -50,6 +53,10 @@ class RecepteurActionPrise : BroadcastReceiver() {
                         notifications.retirer(cle)
                     }
                 }
+            } catch (erreur: Throwable) {
+                // Une exception non rattrapée ici tuerait le processus depuis
+                // l'arrière-plan : on la rend visible sans faire tomber l'app.
+                Log.e(ETIQUETTE, "action $action non traitée pour $cle", erreur)
             } finally {
                 termine.finish()
             }

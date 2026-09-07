@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
@@ -17,6 +18,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -50,9 +52,38 @@ fun EditionEcran(
     vue: EditionViewModel = hiltViewModel(),
 ) {
     val etat by vue.etat.collectAsStateWithLifecycle()
+    var confirmationSuppression by remember { mutableStateOf(false) }
 
     LaunchedEffect(medicamentId) { vue.charger(medicamentId) }
     LaunchedEffect(etat.enregistre) { if (etat.enregistre) surSortie() }
+
+    // La clé étrangère de `evenement_prise` est en cascade : supprimer efface
+    // aussi tout le journal des prises du médicament, sans retour possible.
+    if (confirmationSuppression) {
+        AlertDialog(
+            onDismissRequest = { confirmationSuppression = false },
+            title = { Text("Supprimer ce médicament ?") },
+            text = {
+                Text(
+                    "« ${etat.nom} » et l'historique de toutes ses prises seront " +
+                        "définitivement effacés. Cette action est irréversible.",
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        confirmationSuppression = false
+                        vue.supprimer()
+                    },
+                ) {
+                    Text("Supprimer")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmationSuppression = false }) { Text("Annuler") }
+            },
+        )
+    }
 
     Column(
         modifier = Modifier
@@ -185,7 +216,7 @@ fun EditionEcran(
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(onClick = { vue.enregistrer() }) { Text("Enregistrer") }
             if (etat.id != 0L) {
-                OutlinedButton(onClick = { vue.supprimer() }) { Text("Supprimer") }
+                OutlinedButton(onClick = { confirmationSuppression = true }) { Text("Supprimer") }
             }
         }
     }

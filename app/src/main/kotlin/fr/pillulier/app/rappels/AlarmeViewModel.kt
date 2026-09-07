@@ -45,7 +45,14 @@ class AlarmeViewModel @Inject constructor(
         this.cle = cle
         this.dose = dose
 
-        val medicament = medicaments.parId(cle.medicamentId) ?: return
+        // Un médicament supprimé entre l'armement et le déclenchement laisserait
+        // sinon une alarme plein écran vide, muette et sans cible, par-dessus
+        // l'écran verrouillé : on termine tout de suite.
+        val medicament = medicaments.parId(cle.medicamentId) ?: run {
+            _etat.update { it.copy(termine = true) }
+            return
+        }
+
         _etat.update {
             it.copy(
                 nom = medicament.nom,

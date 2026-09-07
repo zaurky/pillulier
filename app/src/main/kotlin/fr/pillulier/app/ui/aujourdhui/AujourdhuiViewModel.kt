@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import fr.pillulier.app.data.DepotMedicaments
 import fr.pillulier.app.data.DepotOrdonnances
+import fr.pillulier.app.rappels.Notifications
 import fr.pillulier.app.temps.Horloge
 import fr.pillulier.app.usecase.Alerte
 import fr.pillulier.app.usecase.EnregistrerPrise
@@ -12,6 +13,7 @@ import fr.pillulier.app.usecase.LigneJournee
 import fr.pillulier.app.usecase.ObserverAlertes
 import fr.pillulier.app.usecase.ObserverJournee
 import fr.pillulier.app.usecase.ReArmerRappels
+import fr.pillulier.domain.CleRappel
 import fr.pillulier.domain.Medicament
 import fr.pillulier.domain.TypeOrdonnance
 import kotlinx.coroutines.flow.SharingStarted
@@ -35,6 +37,7 @@ class AujourdhuiViewModel @Inject constructor(
     ordonnances: DepotOrdonnances,
     private val enregistrerPrise: EnregistrerPrise,
     private val reArmerRappels: ReArmerRappels,
+    private val notifications: Notifications,
     private val horloge: Horloge,
 ) : ViewModel() {
 
@@ -59,7 +62,12 @@ class AujourdhuiViewModel @Inject constructor(
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), EtatAujourdhui())
 
     fun cocher(ligne: LigneJournee) = viewModelScope.launch {
-        enregistrerPrise(ligne.medicamentId, horloge.aujourdhui(), ligne.moment, ligne.dose)
+        val jour = horloge.aujourdhui()
+        enregistrerPrise(ligne.medicamentId, jour, ligne.moment, ligne.dose)
+        // Le réarmement annule l'alarme mais pas la notification déjà postée :
+        // celle d'une prise critique est `setOngoing`, donc impossible à
+        // balayer, et resterait affichée jusqu'à la clôture de la journée.
+        notifications.retirer(CleRappel(ligne.medicamentId, jour, ligne.moment))
         reArmerRappels()
     }
 

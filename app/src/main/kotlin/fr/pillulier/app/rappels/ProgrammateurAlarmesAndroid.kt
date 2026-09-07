@@ -4,6 +4,7 @@ import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import fr.pillulier.domain.CleRappel
 import fr.pillulier.domain.Moment
 import fr.pillulier.domain.codeRequete
@@ -25,13 +26,28 @@ class ProgrammateurAlarmesAndroid @Inject constructor(
 
     override fun programmer(cle: CleRappel, quand: LocalDateTime, critique: Boolean) {
         val declenchement = quand.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+        val intention = creerIntentEnAttente(cle, critique)
 
-        gestionnaire.setExactAndAllowWhileIdle(
-            AlarmManager.RTC_WAKEUP,
-            declenchement,
-            creerIntentEnAttente(cle, critique),
-        )
+        // Une autorisation d'alarme exacte retirée doit dégrader la ponctualité
+        // du rappel, pas casser l'application : `setExactAndAllowWhileIdle`
+        // lèverait une `SecurityException` au beau milieu d'un réarmement.
+        if (peutProgrammerExactement()) {
+            gestionnaire.setExactAndAllowWhileIdle(
+                AlarmManager.RTC_WAKEUP,
+                declenchement,
+                intention,
+            )
+        } else {
+            gestionnaire.setAndAllowWhileIdle(
+                AlarmManager.RTC_WAKEUP,
+                declenchement,
+                intention,
+            )
+        }
     }
+
+    private fun peutProgrammerExactement(): Boolean =
+        Build.VERSION.SDK_INT < Build.VERSION_CODES.S || gestionnaire.canScheduleExactAlarms()
 
     override fun annuler(cle: CleRappel) {
         rechercherIntentEnAttente(cle)?.let {

@@ -1,5 +1,6 @@
 package fr.pillulier.app.ui.medicaments
 
+import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -9,6 +10,7 @@ import fr.pillulier.app.data.DepotMoments
 import fr.pillulier.app.data.DepotOrdonnances
 import fr.pillulier.app.data.db.PillulierDatabase
 import fr.pillulier.app.data.db.momentsParDefaut
+import fr.pillulier.app.rappels.Notifications
 import fr.pillulier.app.usecase.EnregistrerMedicament
 import fr.pillulier.app.usecase.HorlogeFigee
 import fr.pillulier.app.usecase.ProgrammateurEspion
@@ -37,6 +39,7 @@ import kotlin.test.assertTrue
 @Config(sdk = [34])
 class EditionViewModelTest {
 
+    private lateinit var contexte: Context
     private lateinit var base: PillulierDatabase
     private lateinit var medicaments: DepotMedicaments
     private lateinit var vue: EditionViewModel
@@ -47,7 +50,7 @@ class EditionViewModelTest {
         // `viewModelScope` lance sur le dispatcher Main, en pause sous Robolectric.
         Dispatchers.setMain(UnconfinedTestDispatcher())
 
-        val contexte = ApplicationProvider.getApplicationContext<android.content.Context>()
+        contexte = ApplicationProvider.getApplicationContext()
         base = Room.inMemoryDatabaseBuilder(contexte, PillulierDatabase::class.java)
             .addCallback(momentsParDefaut)
             .allowMainThreadQueries()
@@ -68,7 +71,13 @@ class EditionViewModelTest {
             medicaments = medicaments,
             ordonnances = ordonnances,
             enregistrerMedicament = EnregistrerMedicament(medicaments, ordonnances, reArmer),
-            supprimerMedicament = SupprimerMedicament(medicaments, reArmer),
+            supprimerMedicament = SupprimerMedicament(
+                medicaments = medicaments,
+                programmateur = ProgrammateurEspion(),
+                notifications = Notifications(contexte),
+                reArmerRappels = reArmer,
+                horloge = horloge,
+            ),
             horloge = horloge,
         )
     }
@@ -118,5 +127,24 @@ class EditionViewModelTest {
 
         assertNull(vue.etat.value.erreur)
         assertEquals(9.5, medicaments.tous().single().stockUnites)
+    }
+
+    @Test
+    fun `un second chargement du meme medicament ne rejette pas la saisie en cours`() = runTest {
+        remplirFormulaireValide()
+        vue.enregistrer().join()
+        val id = medicaments.tous().single().id
+
+        // Premier passage : l'écran s'ouvre sur le médicament existant.
+        vue.charger(id).join()
+        assertEquals("Levothyrox", vue.etat.value.nom)
+
+        // L'utilisateur tape, puis fait tourner le téléphone : le
+        // `LaunchedEffect` de l'écran relance `charger` avec le même
+        // identifiant, et ne doit plus rien écraser.
+        vue.modifierNom("Levothyrox 100")
+        vue.charger(id).join()
+
+        assertEquals("Levothyrox 100", vue.etat.value.nom)
     }
 }

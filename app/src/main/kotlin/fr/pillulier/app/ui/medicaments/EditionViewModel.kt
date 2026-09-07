@@ -54,8 +54,17 @@ class EditionViewModel @Inject constructor(
     private val _etat = MutableStateFlow(EtatEdition(dateDebut = horloge.aujourdhui()))
     val etat: StateFlow<EtatEdition> = _etat.asStateFlow()
 
+    /**
+     * Le `LaunchedEffect` de l'écran se relance à chaque recomposition initiale,
+     * donc à chaque rotation : la vue survit, la composition non. Sans ce garde,
+     * le second appel écraserait le formulaire en cours de saisie par la base.
+     */
+    private var dejaCharge = false
+
     fun charger(medicamentId: Long?) = viewModelScope.launch {
         if (medicamentId == null || medicamentId == 0L) return@launch
+        if (dejaCharge) return@launch
+        dejaCharge = true
 
         val medicament = medicaments.parId(medicamentId) ?: return@launch
         val ordonnance = ordonnances.pourMedicament(medicamentId)

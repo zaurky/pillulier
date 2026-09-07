@@ -3,6 +3,7 @@ package fr.pillulier.app.rappels
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.util.Log
 import dagger.hilt.android.AndroidEntryPoint
 import fr.pillulier.app.data.DepotMedicaments
 import fr.pillulier.app.data.DepotOrdonnances
@@ -12,6 +13,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+
+private const val ETIQUETTE = "RecepteurRappel"
 
 /**
  * Poste la notification du médicament attendu, puis arme immédiatement la
@@ -35,6 +38,12 @@ class RecepteurRappel : BroadcastReceiver() {
 
         CoroutineScope(Dispatchers.IO).launch {
             try {
+                // « Aucune relance ne survit au lendemain » est un invariant du
+                // rappel lui-même, pas une conséquence de la clôture de 00h05 :
+                // le travail périodique est reportable, et une chaîne d'hier
+                // relancerait sinon toutes les quinze minutes en pleine nuit.
+                if (cle.date != horloge.aujourdhui()) return@launch
+
                 val medicament = medicaments.parId(cle.medicamentId) ?: return@launch
                 val dose = ordonnances.pourMedicament(cle.medicamentId)
                     ?.doses
@@ -50,6 +59,10 @@ class RecepteurRappel : BroadcastReceiver() {
                     quand = horloge.maintenant().plusMinutes(intervalle.toLong()),
                     critique = critique,
                 )
+            } catch (erreur: Throwable) {
+                // Une exception non rattrapée ici tuerait le processus depuis
+                // l'arrière-plan : on la rend visible sans faire tomber l'app.
+                Log.e(ETIQUETTE, "rappel non posté pour $cle", erreur)
             } finally {
                 termine.finish()
             }

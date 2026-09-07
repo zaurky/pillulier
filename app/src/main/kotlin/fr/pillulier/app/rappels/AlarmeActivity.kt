@@ -1,21 +1,26 @@
 package fr.pillulier.app.rappels
 
+import android.content.Intent
 import android.media.AudioAttributes
-import android.media.RingtoneManager
 import android.media.Ringtone
+import android.media.RingtoneManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -39,9 +44,7 @@ class AlarmeActivity : ComponentActivity() {
         setShowWhenLocked(true)
         setTurnScreenOn(true)
 
-        val cle = cleDepuisIntent(intent)
-        val dose = intent.getDoubleExtra(EXTRA_DOSE, 0.0)
-        lifecycleScope.launch { vue.charger(cle, dose) }
+        presenter(intent)
 
         demarrerSonnerie()
 
@@ -52,8 +55,10 @@ class AlarmeActivity : ComponentActivity() {
                 if (etat.termine) finish()
             }
 
-            MaterialTheme {
-                Surface(modifier = Modifier.fillMaxSize()) {
+            MaterialTheme(
+                colorScheme = if (isSystemInDarkTheme()) darkColorScheme() else lightColorScheme(),
+            ) {
+                Surface(modifier = Modifier.fillMaxSize().safeDrawingPadding()) {
                     Column(
                         modifier = Modifier.fillMaxSize().padding(24.dp),
                         verticalArrangement = Arrangement.Center,
@@ -75,6 +80,24 @@ class AlarmeActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    /**
+     * L'activité est `singleInstance` : un second médicament critique du même
+     * moment — les comprimés puis la piqûre — atteint l'instance vivante sans
+     * repasser par `onCreate`. Sans cela, le second rappel resterait muet
+     * derrière l'écran du premier.
+     */
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        presenter(intent)
+    }
+
+    private fun presenter(intention: Intent) {
+        val cle = cleDepuisIntent(intention)
+        val dose = intention.getDoubleExtra(EXTRA_DOSE, 0.0)
+        lifecycleScope.launch { vue.charger(cle, dose) }
     }
 
     private fun demarrerSonnerie() {

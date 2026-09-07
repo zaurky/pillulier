@@ -2,8 +2,13 @@ package fr.pillulier.app.usecase
 
 import fr.pillulier.app.data.DepotMedicaments
 import fr.pillulier.app.data.DepotOrdonnances
+import fr.pillulier.app.rappels.Notifications
+import fr.pillulier.app.rappels.ProgrammateurAlarmes
+import fr.pillulier.app.temps.Horloge
+import fr.pillulier.domain.CleRappel
 import fr.pillulier.domain.DosePrescrite
 import fr.pillulier.domain.Medicament
+import fr.pillulier.domain.Moment
 import fr.pillulier.domain.Ordonnance
 import fr.pillulier.domain.Rythme
 import fr.pillulier.domain.TypeOrdonnance
@@ -60,11 +65,30 @@ class EnregistrerMedicament @Inject constructor(
     }
 }
 
+/**
+ * Le réarmement annule un surensemble bâti sur `medicaments.tous()` : une fois
+ * la ligne effacée, l'identifiant en a disparu et sa fenêtre d'alarmes resterait
+ * armée, sa notification devenant inatteignable — indéboulonnable si elle est
+ * critique. On ferme donc sa fenêtre **avant** de supprimer.
+ */
 class SupprimerMedicament @Inject constructor(
     private val medicaments: DepotMedicaments,
+    private val programmateur: ProgrammateurAlarmes,
+    private val notifications: Notifications,
     private val reArmerRappels: ReArmerRappels,
+    private val horloge: Horloge,
 ) {
     suspend operator fun invoke(medicamentId: Long) {
+        val aujourdhui = horloge.aujourdhui()
+        (-1L until ReArmerRappels.JOURS_FENETRE).forEach { decalage ->
+            val jour = aujourdhui.plusDays(decalage)
+            Moment.entries.forEach { moment ->
+                val cle = CleRappel(medicamentId, jour, moment)
+                programmateur.annuler(cle)
+                notifications.retirer(cle)
+            }
+        }
+
         medicaments.supprimer(medicamentId)
         reArmerRappels()
     }

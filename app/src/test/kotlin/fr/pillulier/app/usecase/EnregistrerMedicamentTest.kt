@@ -9,6 +9,8 @@ import fr.pillulier.app.data.DepotEvenements
 import fr.pillulier.app.data.DepotOrdonnances
 import fr.pillulier.app.data.db.PillulierDatabase
 import fr.pillulier.app.data.db.momentsParDefaut
+import fr.pillulier.app.rappels.Notifications
+import fr.pillulier.domain.CleRappel
 import fr.pillulier.domain.DosePrescrite
 import fr.pillulier.domain.Forme
 import fr.pillulier.domain.Medicament
@@ -58,7 +60,13 @@ class EnregistrerMedicamentTest {
             horloge = horloge,
         )
         enregistrer = EnregistrerMedicament(medicaments, ordonnances, reArmer)
-        supprimer = SupprimerMedicament(medicaments, reArmer)
+        supprimer = SupprimerMedicament(
+            medicaments = medicaments,
+            programmateur = programmateur,
+            notifications = Notifications(ApplicationProvider.getApplicationContext()),
+            reArmerRappels = reArmer,
+            horloge = horloge,
+        )
     }
 
     @After
@@ -201,5 +209,32 @@ class EnregistrerMedicamentTest {
 
         assertNull(medicaments.parId(id))
         assertNull(ordonnances.pourMedicament(id))
+    }
+
+    @Test
+    fun `supprimer annule les alarmes du medicament avant de l effacer`() = runTest {
+        val id = enregistrer(
+            medicament = levothyrox(),
+            type = TypeOrdonnance.PLANIFIEE,
+            rythme = Rythme.TousLesJours,
+            dateDebut = LocalDate.of(2026, 1, 1),
+            dateFin = null,
+            doses = listOf(DosePrescrite(Moment.MATIN, 1.0)),
+        )
+        programmateur.annulees.clear()
+
+        supprimer(id)
+
+        // La veille plus la fenêtre, les quatre moments : le réarmement qui suit
+        // ne verrait plus cet identifiant dans `medicaments.tous()`.
+        val attendues = (-1L until ReArmerRappels.JOURS_FENETRE).flatMap { decalage ->
+            Moment.entries.map { moment ->
+                CleRappel(id, LocalDate.of(2026, 1, 5).plusDays(decalage), moment)
+            }
+        }
+        assertTrue(
+            programmateur.annulees.containsAll(attendues),
+            "les alarmes du medicament supprime doivent etre annulees",
+        )
     }
 }
