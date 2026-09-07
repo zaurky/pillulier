@@ -29,34 +29,46 @@ class ProgrammateurAlarmesAndroid @Inject constructor(
         gestionnaire.setExactAndAllowWhileIdle(
             AlarmManager.RTC_WAKEUP,
             declenchement,
-            // Sans FLAG_NO_CREATE, l'intention en attente n'est jamais nulle.
-            intentEnAttente(cle, critique, PendingIntent.FLAG_UPDATE_CURRENT)!!,
+            creerIntentEnAttente(cle, critique),
         )
     }
 
     override fun annuler(cle: CleRappel) {
-        val existant = intentEnAttente(cle, critique = false, drapeaux = PendingIntent.FLAG_NO_CREATE)
-        existant?.let {
+        rechercherIntentEnAttente(cle)?.let {
             gestionnaire.cancel(it)
             it.cancel()
         }
     }
 
-    private fun intentEnAttente(cle: CleRappel, critique: Boolean, drapeaux: Int): PendingIntent? {
-        val intention = Intent(contexte, RecepteurRappel::class.java).apply {
+    /** Crée ou remplace l'intention en attente du rappel : jamais nulle. */
+    private fun creerIntentEnAttente(cle: CleRappel, critique: Boolean): PendingIntent =
+        PendingIntent.getBroadcast(
+            contexte,
+            cle.codeRequete(),
+            intentionRappel(cle, critique),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+
+    /**
+     * Retrouve l'intention en attente sans la créer : nulle quand aucune alarme
+     * n'est armée pour cette clé. L'égalité des `PendingIntent` ignore les extras,
+     * donc le drapeau critique passé ici est sans importance.
+     */
+    private fun rechercherIntentEnAttente(cle: CleRappel): PendingIntent? =
+        PendingIntent.getBroadcast(
+            contexte,
+            cle.codeRequete(),
+            intentionRappel(cle, critique = false),
+            PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE,
+        )
+
+    private fun intentionRappel(cle: CleRappel, critique: Boolean): Intent =
+        Intent(contexte, RecepteurRappel::class.java).apply {
             putExtra(EXTRA_MEDICAMENT_ID, cle.medicamentId)
             putExtra(EXTRA_DATE, cle.date.toEpochDay())
             putExtra(EXTRA_MOMENT, cle.moment.name)
             putExtra(EXTRA_CRITIQUE, critique)
         }
-
-        return PendingIntent.getBroadcast(
-            contexte,
-            cle.codeRequete(),
-            intention,
-            drapeaux or PendingIntent.FLAG_IMMUTABLE,
-        )
-    }
 }
 
 /** Reconstruit une clé depuis les extras d'une intention. */

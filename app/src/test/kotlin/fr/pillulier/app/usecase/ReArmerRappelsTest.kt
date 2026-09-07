@@ -175,8 +175,38 @@ class ReArmerRappelsTest {
                 LocalDate.of(2026, 1, 6),
                 LocalDate.of(2026, 1, 7),
             ),
-            programmateur.annulees.map { it.date },
+            programmateur.annulees.map { it.date }.distinct(),
         )
+        assertEquals(16, programmateur.annulees.size, "4 jours x 4 moments pour un medicament")
+    }
+
+    @Test
+    fun `une dose retiree de l ordonnance voit son alarme annulee au rearmement`() = runTest {
+        val id = medicamentPlanifie(
+            "Metformine",
+            doses = listOf(DosePrescrite(Moment.MATIN, 1.0), DosePrescrite(Moment.SOIR, 1.0)),
+        )
+        reArmer()
+        programmateur.programmees.clear()
+        programmateur.annulees.clear()
+
+        // L'ordonnance perd sa dose du soir.
+        ordonnances.enregistrer(
+            medicamentId = id,
+            ordonnance = Ordonnance(
+                id = 0,
+                medicamentId = id,
+                type = TypeOrdonnance.PLANIFIEE,
+                rythme = Rythme.TousLesJours,
+                dateDebut = LocalDate.of(2026, 1, 1),
+                dateFin = null,
+            ),
+            doses = listOf(DosePrescrite(Moment.MATIN, 1.0)),
+        )
+        reArmer()
+
+        assertTrue(CleRappel(id, LocalDate.of(2026, 1, 5), Moment.SOIR) in programmateur.annulees)
+        assertTrue(programmateur.programmees.none { it.cle.moment == Moment.SOIR })
     }
 
     @Test

@@ -7,6 +7,7 @@ import fr.pillulier.app.data.DepotOrdonnances
 import fr.pillulier.app.rappels.ProgrammateurAlarmes
 import fr.pillulier.app.temps.Horloge
 import fr.pillulier.domain.CleRappel
+import fr.pillulier.domain.Moment
 import fr.pillulier.domain.StatutPrise
 import fr.pillulier.domain.prisesAttendues
 import fr.pillulier.domain.statut
@@ -30,14 +31,19 @@ class ReArmerRappels @Inject constructor(
         val aujourdhui = maintenant.toLocalDate()
         val heures = moments.heures()
         val toutes = ordonnances.toutes()
-        val critiques = medicaments.tous().filter { it.critique }.map { it.id }.toSet()
+        val tousMedicaments = medicaments.tous()
+        val critiques = tousMedicaments.filter { it.critique }.map { it.id }.toSet()
 
-        // La veille est annulée en même temps que la fenêtre : elle peut porter
-        // une relance qui n'a pas à survivre à la journée.
-        val jourAnnules = (-1L until JOURS_FENETRE).map { aujourdhui.plusDays(it) }
-        jourAnnules.forEach { jour ->
-            prisesAttendues(jour, toutes, heures).forEach { prise ->
-                programmateur.annuler(CleRappel(prise.medicamentId, jour, prise.moment))
+        // On annule un surensemble : tout médicament connu, tout moment, sur la
+        // veille et la fenêtre. Dériver les clés du planning courant laisserait
+        // vivre l'alarme d'une dose qui vient d'être retirée de l'ordonnance, ou
+        // d'une cure dont la date de fin a reculé.
+        (-1L until JOURS_FENETRE).forEach { decalage ->
+            val jour = aujourdhui.plusDays(decalage)
+            tousMedicaments.forEach { medicament ->
+                Moment.entries.forEach { moment ->
+                    programmateur.annuler(CleRappel(medicament.id, jour, moment))
+                }
             }
         }
 
