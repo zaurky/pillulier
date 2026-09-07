@@ -3,6 +3,7 @@ package fr.pillulier.app.data
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -17,6 +18,7 @@ private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(na
 private val CLE_DELAI_PLUS_TARD = intPreferencesKey("delai_plus_tard_minutes")
 private val CLE_INTERVALLE_RELANCE = intPreferencesKey("intervalle_relance_minutes")
 private val CLE_SEUIL_ALERTE_JOURS = intPreferencesKey("seuil_alerte_jours_defaut")
+private val CLE_AUTORISATIONS_VUES = booleanPreferencesKey("autorisations_vues")
 
 const val DELAI_PLUS_TARD_DEFAUT = 15
 const val INTERVALLE_RELANCE_DEFAUT = 15
@@ -40,6 +42,13 @@ class DepotPreferences @Inject constructor(private val contexte: Context) {
     }
 
     suspend fun instantane(): PreferencesPillulier = preferences.first()
+
+    val autorisationsVues: Flow<Boolean> =
+        contexte.dataStore.data.map { it[CLE_AUTORISATIONS_VUES] ?: false }
+
+    suspend fun marquerAutorisationsVues() {
+        contexte.dataStore.edit { it[CLE_AUTORISATIONS_VUES] = true }
+    }
 
     suspend fun definirDelaiPlusTard(minutes: Int) =
         ecrire(CLE_DELAI_PLUS_TARD, minutes)
