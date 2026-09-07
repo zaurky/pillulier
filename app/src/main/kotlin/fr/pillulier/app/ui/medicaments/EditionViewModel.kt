@@ -113,6 +113,22 @@ class EditionViewModel @Inject constructor(
 
     fun enregistrer() = viewModelScope.launch {
         val etat = _etat.value
+
+        val unitesParBoite = etat.unitesParBoite.toIntOrNull()
+        val stockUnites = etat.stockUnites.replace(',', '.').toDoubleOrNull()
+
+        // Un champ numérique non vide qui ne se lit pas est une erreur de saisie,
+        // pas un zéro : le domaine ne reçoit qu'un nombre et ne pourrait plus
+        // faire la différence.
+        if (etat.unitesParBoite.isNotBlank() && unitesParBoite == null) {
+            _etat.update { it.copy(erreur = "Unités par boîte : nombre illisible") }
+            return@launch
+        }
+        if (etat.stockUnites.isNotBlank() && stockUnites == null) {
+            _etat.update { it.copy(erreur = "Stock : nombre illisible") }
+            return@launch
+        }
+
         try {
             enregistrerMedicament(
                 medicament = Medicament(
@@ -120,8 +136,8 @@ class EditionViewModel @Inject constructor(
                     nom = etat.nom.trim(),
                     dosage = etat.dosage.trim(),
                     forme = etat.forme,
-                    unitesParBoite = etat.unitesParBoite.toIntOrNull() ?: 0,
-                    stockUnites = etat.stockUnites.replace(',', '.').toDoubleOrNull() ?: 0.0,
+                    unitesParBoite = unitesParBoite ?: 0,
+                    stockUnites = stockUnites ?: 0.0,
                     seuilAlerteJours = etat.seuilAlerteJours.toIntOrNull(),
                     seuilAlerteUnites = etat.seuilAlerteUnites.toIntOrNull(),
                     critique = etat.critique,

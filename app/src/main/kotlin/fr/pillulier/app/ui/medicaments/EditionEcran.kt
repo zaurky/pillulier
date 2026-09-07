@@ -30,6 +30,8 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import fr.pillulier.app.ui.formaterDose
+import fr.pillulier.app.ui.libelleForme
+import fr.pillulier.app.ui.libelleJour
 import fr.pillulier.app.ui.libelleMoment
 import fr.pillulier.domain.Forme
 import fr.pillulier.domain.Moment
@@ -78,7 +80,7 @@ fun EditionEcran(
                 FilterChip(
                     selected = etat.forme == forme,
                     onClick = { vue.modifierForme(forme) },
-                    label = { Text(forme.name.lowercase()) },
+                    label = { Text(libelleForme(forme, 1.0)) },
                 )
             }
         }
@@ -131,7 +133,7 @@ fun EditionEcran(
                     FilterChip(
                         selected = jour in actifs,
                         onClick = { vue.basculerJourDeSemaine(jour) },
-                        label = { Text(jour.name.take(2)) },
+                        label = { Text(libelleJour(jour)) },
                     )
                 }
             }

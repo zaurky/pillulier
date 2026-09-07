@@ -3,6 +3,7 @@ package fr.pillulier.app.ui
 import fr.pillulier.domain.Forme
 import fr.pillulier.domain.Moment
 import fr.pillulier.domain.StatutPrise
+import java.time.DayOfWeek
 
 /** `0,5` s'écrit `½`, `1,5` s'écrit `1½`, une valeur entière sans décimale. */
 fun formaterDose(dose: Double): String {
@@ -41,4 +42,15 @@ fun libelleStatut(statut: StatutPrise): String = when (statut) {
     StatutPrise.EN_RETARD -> "En retard"
     StatutPrise.PRISE -> "Prise"
     StatutPrise.OUBLIEE -> "Oubliée"
+}
+
+/** Abréviation à deux lettres, dans l'ordre où les puces de l'écran d'édition les affichent. */
+fun libelleJour(jour: DayOfWeek): String = when (jour) {
+    DayOfWeek.MONDAY -> "Lu"
+    DayOfWeek.TUESDAY -> "Ma"
+    DayOfWeek.WEDNESDAY -> "Me"
+    DayOfWeek.THURSDAY -> "Je"
+    DayOfWeek.FRIDAY -> "Ve"
+    DayOfWeek.SATURDAY -> "Sa"
+    DayOfWeek.SUNDAY -> "Di"
 }

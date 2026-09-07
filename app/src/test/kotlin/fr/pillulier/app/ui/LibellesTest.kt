@@ -3,6 +3,7 @@ package fr.pillulier.app.ui
 import fr.pillulier.domain.Forme
 import fr.pillulier.domain.Moment
 import org.junit.Test
+import java.time.DayOfWeek
 import kotlin.test.assertEquals
 
 class LibellesTest {
@@ -49,5 +50,16 @@ class LibellesTest {
         assertEquals("Midi", libelleMoment(Moment.MIDI))
         assertEquals("Soir", libelleMoment(Moment.SOIR))
         assertEquals("Coucher", libelleMoment(Moment.COUCHER))
+    }
+
+    @Test
+    fun `les jours de la semaine ont une abreviation francaise`() {
+        assertEquals("Lu", libelleJour(DayOfWeek.MONDAY))
+        assertEquals("Ma", libelleJour(DayOfWeek.TUESDAY))
+        assertEquals("Me", libelleJour(DayOfWeek.WEDNESDAY))
+        assertEquals("Je", libelleJour(DayOfWeek.THURSDAY))
+        assertEquals("Ve", libelleJour(DayOfWeek.FRIDAY))
+        assertEquals("Sa", libelleJour(DayOfWeek.SATURDAY))
+        assertEquals("Di", libelleJour(DayOfWeek.SUNDAY))
     }
 }
