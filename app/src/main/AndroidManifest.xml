@@ -23,6 +23,15 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".rappels.AlarmeActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:launchMode="singleInstance"
+            android:showOnLockScreen="true"
+            android:turnScreenOn="true"
+            android:theme="@style/Theme.Pillulier" />
+
         <receiver
             android:name=".rappels.RecepteurRappel"
             android:exported="false" />
