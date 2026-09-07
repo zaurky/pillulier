@@ -97,10 +97,12 @@ private fun LigneStockCarte(ligne: LigneStock, vue: StockViewModel) {
                 )
                 OutlinedButton(
                     onClick = {
-                        correction.replace(',', '.').toDoubleOrNull()?.let {
-                            vue.corriger(ligne.medicamentId, it)
-                            correction = ""
-                        }
+                        correction.replace(',', '.').toDoubleOrNull()
+                            ?.takeIf { it >= 0.0 }
+                            ?.let {
+                                vue.corriger(ligne.medicamentId, it)
+                                correction = ""
+                            }
                     },
                 ) {
                     Text("OK")
