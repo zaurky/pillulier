@@ -1,0 +1,69 @@
+package fr.pillulier.app.ui.aujourdhui
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import dagger.hilt.android.lifecycle.HiltViewModel
+import fr.pillulier.app.data.DepotMedicaments
+import fr.pillulier.app.data.DepotOrdonnances
+import fr.pillulier.app.temps.Horloge
+import fr.pillulier.app.usecase.Alerte
+import fr.pillulier.app.usecase.EnregistrerPrise
+import fr.pillulier.app.usecase.LigneJournee
+import fr.pillulier.app.usecase.ObserverAlertes
+import fr.pillulier.app.usecase.ObserverJournee
+import fr.pillulier.app.usecase.ReArmerRappels
+import fr.pillulier.domain.Medicament
+import fr.pillulier.domain.TypeOrdonnance
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
+import javax.inject.Inject
+
+data class EtatAujourdhui(
+    val lignes: List<LigneJournee> = emptyList(),
+    val alertes: List<Alerte> = emptyList(),
+    val aLaDemande: List<Medicament> = emptyList(),
+)
+
+@HiltViewModel
+class AujourdhuiViewModel @Inject constructor(
+    observerJournee: ObserverJournee,
+    observerAlertes: ObserverAlertes,
+    medicaments: DepotMedicaments,
+    ordonnances: DepotOrdonnances,
+    private val enregistrerPrise: EnregistrerPrise,
+    private val reArmerRappels: ReArmerRappels,
+    private val horloge: Horloge,
+) : ViewModel() {
+
+    val etat: StateFlow<EtatAujourdhui> = combine(
+        observerJournee(horloge.aujourdhui()),
+        observerAlertes(),
+        medicaments.observerTous(),
+        ordonnances.observerToutes(),
+    ) { lignes, alertes, tous, toutesOrdonnances ->
+        // Les médicaments à la demande n'ont aucune prise planifiée : ils sont
+        // proposés à part, pour un enregistrement ponctuel.
+        val idsALaDemande = toutesOrdonnances
+            .filter { it.ordonnance.type == TypeOrdonnance.A_LA_DEMANDE }
+            .map { it.ordonnance.medicamentId }
+            .toSet()
+
+        EtatAujourdhui(
+            lignes = lignes,
+            alertes = alertes,
+            aLaDemande = tous.filter { it.id in idsALaDemande },
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), EtatAujourdhui())
+
+    fun cocher(ligne: LigneJournee) = viewModelScope.launch {
+        enregistrerPrise(ligne.medicamentId, horloge.aujourdhui(), ligne.moment, ligne.dose)
+        reArmerRappels()
+    }
+
+    fun enregistrerALaDemande(medicamentId: Long, dose: Double) = viewModelScope.launch {
+        enregistrerPrise(medicamentId, horloge.aujourdhui(), moment = null, dose = dose)
+    }
+}
