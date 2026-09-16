@@ -69,6 +69,9 @@ l'application.
 Le widget est redimensionnable et la liste est une `LazyColumn`, donc une journée
 chargée défile au lieu d'être tronquée.
 
+L'appui sur une ligne ailleurs que sur sa case — et l'appui sur l'état vide — ouvre
+`MainActivity` sur l'écran Aujourd'hui. Seule la case à cocher enregistre.
+
 ## Rafraîchissement
 
 Tant que la session Glance vit, toute écriture en base se propage seule au widget par le
