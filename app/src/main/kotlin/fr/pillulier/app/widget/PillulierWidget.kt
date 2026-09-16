@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.unit.dp
@@ -11,6 +12,8 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
 import androidx.glance.GlanceTheme
+import androidx.glance.LocalContext
+import androidx.glance.LocalGlanceId
 import androidx.glance.action.actionParametersOf
 import androidx.glance.action.actionStartActivity
 import androidx.glance.action.clickable
@@ -37,6 +40,7 @@ import androidx.glance.text.TextStyle
 import fr.pillulier.app.MainActivity
 import fr.pillulier.app.ui.libelleMoment
 import java.time.format.DateTimeFormatter
+import kotlinx.coroutines.delay
 
 /** Les mêmes schémas de couleurs que `MainActivity` : le widget doit ressembler à l'app. */
 private val couleursWidget = ColorProviders(light = lightColorScheme(), dark = darkColorScheme())
@@ -53,6 +57,22 @@ object PillulierWidget : GlanceAppWidget() {
         provideContent {
             val lignes by journee.collectAsState(initial = emptyList())
             val annulable = lireAnnulable(currentState<Preferences>())
+
+            val glanceId = LocalGlanceId.current
+            val contexte = LocalContext.current
+
+            // La fenêtre se referme d'elle-même, sans attendre une autre
+            // écriture. `lignesDuWidget` revérifie l'expiration de son côté :
+            // si le processus a été tué entre-temps, ce `LaunchedEffect` n'a
+            // jamais tourné et l'état persisté ne doit pas ressusciter la ligne.
+            LaunchedEffect(annulable) {
+                val restant = annulable?.let {
+                    it.expiration.toEpochMilli() - horloge.instant().toEpochMilli()
+                } ?: return@LaunchedEffect
+                if (restant > 0) delay(restant)
+                ecrireAnnulable(contexte, glanceId, annulable = null)
+                PillulierWidget.update(contexte, glanceId)
+            }
 
             GlanceTheme(colors = couleursWidget) {
                 ContenuWidget(lignesDuWidget(lignes, annulable, horloge.instant()))

@@ -5,6 +5,7 @@ import androidx.glance.action.ActionParameters
 import androidx.glance.action.actionParametersOf
 import androidx.glance.appwidget.action.ActionCallback
 import androidx.glance.appwidget.action.RunCallbackAction
+import androidx.glance.appwidget.testing.unit.hasRunCallbackClickAction
 import androidx.glance.appwidget.testing.unit.runGlanceAppWidgetUnitTest
 import androidx.glance.testing.GlanceNodeMatcher
 import androidx.glance.testing.unit.MappedNode
@@ -103,6 +104,28 @@ class PillulierWidgetTest {
         onNode(
             hasCaseRunCallbackAction(
                 callbackClass = ActionCocher::class.java,
+                parameters = actionParametersOf(
+                    CLE_MEDICAMENT to 7L,
+                    CLE_MOMENT to Moment.MATIN.name,
+                    CLE_DOSE to 1.0,
+                ),
+            ),
+        ).assertExists()
+    }
+
+    @Test
+    fun `une prise barree propose de l annuler`() = runGlanceAppWidgetUnitTest {
+        provideComposable { ContenuWidget(lignes = listOf(ligneWidget(id = 7L, barree = true))) }
+
+        onNode(hasText("Annuler")).assertExists()
+    }
+
+    @Test
+    fun `annuler une prise barree declenche l action d annulation`() = runGlanceAppWidgetUnitTest {
+        provideComposable { ContenuWidget(lignes = listOf(ligneWidget(id = 7L, barree = true))) }
+
+        onNode(
+            hasRunCallbackClickAction<ActionAnnuler>(
                 parameters = actionParametersOf(
                     CLE_MEDICAMENT to 7L,
                     CLE_MOMENT to Moment.MATIN.name,
