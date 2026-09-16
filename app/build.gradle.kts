@@ -78,6 +78,9 @@ dependencies {
     implementation(libs.hilt.work)
     ksp(libs.hilt.ext.compiler)
 
+    implementation(libs.glance.appwidget)
+    implementation(libs.glance.material3)
+
     testImplementation(libs.junit)
     testImplementation(kotlin("test"))
     testImplementation(libs.coroutines.test)
@@ -85,6 +88,7 @@ dependencies {
     testImplementation(libs.androidx.test.core)
     testImplementation(libs.androidx.junit)
     testImplementation(libs.room.testing)
+    testImplementation(libs.glance.appwidget.testing)
 
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.runner)
