@@ -550,7 +550,6 @@ import androidx.glance.layout.padding
 import androidx.glance.material3.ColorProviders
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
-import androidx.glance.unit.ColorProvider
 import androidx.compose.ui.unit.dp
 import fr.pillulier.app.MainActivity
 
@@ -592,8 +591,6 @@ fun ContenuWidget(lignes: List<LigneWidget>) {
     }
 }
 ```
-
-Note pour l'implémenteur : si `androidx.glance.unit.ColorProvider` n'est pas utilisé, retirer l'import — le projet ne tolère pas les imports morts.
 
 - [ ] **Step 5: Lancer le test et vérifier qu'il passe**
 
@@ -710,6 +707,8 @@ Ajouter à `app/src/test/kotlin/fr/pillulier/app/widget/PillulierWidgetTest.kt` 
 import androidx.glance.action.ActionParameters
 import androidx.glance.action.actionParametersOf
 import androidx.glance.appwidget.testing.unit.hasRunCallbackClickAction
+import androidx.glance.testing.unit.hasStartActivityClickAction
+import fr.pillulier.app.MainActivity
 import fr.pillulier.domain.Moment
 import java.time.LocalTime
 ```
@@ -749,6 +748,13 @@ et, dans la classe :
         onNode(hasText("Doliprane")).assertExists()
         onNode(hasText("Matin")).assertExists()
         onNode(hasText("Soir")).assertExists()
+    }
+
+    @Test
+    fun `l appui hors de la case ouvre l application`() = runGlanceAppWidgetUnitTest {
+        provideComposable { ContenuWidget(lignes = listOf(ligneWidget(id = 7L))) }
+
+        onNode(hasStartActivityClickAction<MainActivity>()).assertExists()
     }
 
     @Test
@@ -984,7 +990,11 @@ private fun LigneCochable(ligne: LigneWidget) {
     )
 
     Row(
-        modifier = GlanceModifier.fillMaxWidth().padding(vertical = 4.dp),
+        // L'appui ailleurs que sur la case ouvre l'app : seule la case enregistre.
+        modifier = GlanceModifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp)
+            .clickable(actionStartActivity<MainActivity>()),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         CheckBox(
@@ -1016,7 +1026,7 @@ private fun LigneCochable(ligne: LigneWidget) {
 - [ ] **Step 6: Lancer les tests et vérifier qu'ils passent**
 
 Run: `./gradlew :app:testDebugUnitTest --tests '*PillulierWidgetTest*'`
-Expected: PASS, 3 tests.
+Expected: PASS, 4 tests.
 
 Si `hasRunCallbackClickAction` ne trouve pas le nœud, c'est que l'action est portée par la case et non par la ligne : ajuster le test pour viser le bon nœud, **pas** la production — l'action doit rester sur la case.
 
@@ -1046,7 +1056,7 @@ Imports à ajouter : `androidx.compose.runtime.collectAsState`, `androidx.compos
 - [ ] **Step 8: Vérifier la compilation et la suite complète**
 
 Run: `./gradlew :app:assembleDebug :domain:test :app:testDebugUnitTest`
-Expected: BUILD SUCCESSFUL, 158 tests.
+Expected: BUILD SUCCESSFUL, 159 tests.
 
 - [ ] **Step 9: Commit**
 
@@ -1104,7 +1114,7 @@ Ajouter à `PillulierWidgetTest.kt` :
 - [ ] **Step 2: Lancer les tests et vérifier qu'ils passent déjà**
 
 Run: `./gradlew :app:testDebugUnitTest --tests '*PillulierWidgetTest*'`
-Expected: PASS, 5 tests — le rendu barré est déjà en place depuis la Task 4. Si un test échoue, corriger `LigneCochable` avant d'aller plus loin.
+Expected: PASS, 6 tests — le rendu barré est déjà en place depuis la Task 4. Si un test échoue, corriger `LigneCochable` avant d'aller plus loin.
 
 - [ ] **Step 3: Refermer la fenêtre quand elle expire**
 
@@ -1183,7 +1193,7 @@ Import à ajouter dans les trois : `fr.pillulier.app.widget.RafraichirWidget`.
 - [ ] **Step 6: Vérifier que la suite complète reste verte**
 
 Run: `./gradlew :domain:test :app:testDebugUnitTest`
-Expected: PASS, 160 tests.
+Expected: PASS, 161 tests.
 
 Si un test existant de `TravailQuotidien` ou des receveurs construit ces classes à la main, il faut lui passer un `RafraichirWidget(ApplicationProvider.getApplicationContext())`. C'est une adaptation attendue, pas un échec.
 
@@ -1210,7 +1220,7 @@ Et dans le tableau de la section `:app`, ajouter la ligne :
 - `widget/` — le widget Glance, ses deux actions et son point de rafraîchissement
 ```
 
-Mettre aussi à jour les chiffres du tableau « Module / Tests » : `:app` passe de 94 à 110.
+Mettre aussi à jour les chiffres du tableau « Module / Tests » : `:app` passe de 94 à 111.
 
 - [ ] **Step 8: Vérifier sur l'appareil**
 
