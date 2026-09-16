@@ -22,8 +22,9 @@ fun estJourActif(ordonnance: Ordonnance, date: LocalDate): Boolean {
 }
 
 /**
- * Unique chemin de calcul du planning : Aujourd'hui, la vue semaine et
- * la programmation des alarmes passent tous les trois par ici.
+ * Unique chemin de calcul du planning : Aujourd'hui, la vue semaine, la
+ * programmation des alarmes et le widget d'écran d'accueil passent tous les
+ * quatre par ici.
  */
 fun prisesAttendues(
     date: LocalDate,

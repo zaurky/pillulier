@@ -13,6 +13,7 @@ import fr.pillulier.app.usecase.LigneJournee
 import fr.pillulier.app.usecase.ObserverAlertes
 import fr.pillulier.app.usecase.ObserverJournee
 import fr.pillulier.app.usecase.ReArmerRappels
+import fr.pillulier.app.widget.RafraichirWidget
 import fr.pillulier.domain.CleRappel
 import fr.pillulier.domain.Medicament
 import fr.pillulier.domain.TypeOrdonnance
@@ -39,6 +40,7 @@ class AujourdhuiViewModel @Inject constructor(
     private val reArmerRappels: ReArmerRappels,
     private val notifications: Notifications,
     private val horloge: Horloge,
+    private val rafraichirWidget: RafraichirWidget,
 ) : ViewModel() {
 
     val etat: StateFlow<EtatAujourdhui> = combine(
@@ -69,9 +71,11 @@ class AujourdhuiViewModel @Inject constructor(
         // balayer, et resterait affichée jusqu'à la clôture de la journée.
         notifications.retirer(CleRappel(ligne.medicamentId, jour, ligne.moment))
         reArmerRappels()
+        rafraichirWidget()
     }
 
     fun enregistrerALaDemande(medicamentId: Long, dose: Double) = viewModelScope.launch {
         enregistrerPrise(medicamentId, horloge.aujourdhui(), moment = null, dose = dose)
+        rafraichirWidget()
     }
 }

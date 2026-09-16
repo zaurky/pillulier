@@ -4,12 +4,19 @@ import fr.pillulier.app.usecase.LigneJournee
 import fr.pillulier.domain.Moment
 import fr.pillulier.domain.StatutPrise
 import java.time.Instant
+import java.time.LocalDate
 import java.time.LocalTime
 
-/** La prise qu'on vient de cocher, et jusqu'à quand on peut encore la décocher. */
+/**
+ * La prise qu'on vient de cocher, et jusqu'à quand on peut encore la décocher.
+ * `date` est le jour exact de la prise enregistrée : sans elle, une annulation
+ * qui recalculerait « aujourd'hui » au moment du clic annulerait la prise du
+ * jour suivant si le clic tombe après minuit.
+ */
 data class Annulable(
     val medicamentId: Long,
     val moment: Moment,
+    val date: LocalDate,
     val expiration: Instant,
 )
 
@@ -24,6 +31,8 @@ data class LigneWidget(
     val heure: LocalTime,
     val enRetard: Boolean,
     val barree: Boolean,
+    /** Le jour de l'annulable, présent seulement quand `barree` : seule l'annulation en a besoin. */
+    val date: LocalDate?,
 )
 
 /**
@@ -54,6 +63,7 @@ fun lignesDuWidget(
             }
         }
         .map { ligne ->
+            val barree = ligne.statut == StatutPrise.PRISE
             LigneWidget(
                 medicamentId = ligne.medicamentId,
                 moment = ligne.moment,
@@ -63,7 +73,8 @@ fun lignesDuWidget(
                 dose = ligne.dose,
                 heure = ligne.heure,
                 enRetard = ligne.statut == StatutPrise.EN_RETARD,
-                barree = ligne.statut == StatutPrise.PRISE,
+                barree = barree,
+                date = if (barree) ouvert?.date else null,
             )
         }
 }

@@ -9,6 +9,7 @@ import fr.pillulier.app.data.DepotMedicaments
 import fr.pillulier.app.data.DepotPreferences
 import fr.pillulier.app.temps.Horloge
 import fr.pillulier.app.usecase.EnregistrerPrise
+import fr.pillulier.app.widget.RafraichirWidget
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -26,6 +27,7 @@ class RecepteurActionPrise : BroadcastReceiver() {
     @Inject lateinit var notifications: Notifications
     @Inject lateinit var programmateur: ProgrammateurAlarmes
     @Inject lateinit var horloge: Horloge
+    @Inject lateinit var rafraichirWidget: RafraichirWidget
 
     override fun onReceive(context: Context, intent: Intent) {
         val cle = cleDepuisIntent(intent)
@@ -40,6 +42,7 @@ class RecepteurActionPrise : BroadcastReceiver() {
                         enregistrerPrise(cle.medicamentId, cle.date, cle.moment, dose)
                         programmateur.annuler(cle)
                         notifications.retirer(cle)
+                        rafraichirWidget()
                     }
 
                     ACTION_PLUS_TARD -> {
@@ -51,6 +54,7 @@ class RecepteurActionPrise : BroadcastReceiver() {
                             critique = critique,
                         )
                         notifications.retirer(cle)
+                        rafraichirWidget()
                     }
                 }
             } catch (erreur: Throwable) {

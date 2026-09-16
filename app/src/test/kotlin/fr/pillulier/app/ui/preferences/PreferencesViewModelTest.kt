@@ -13,6 +13,7 @@ import fr.pillulier.app.data.db.momentsParDefaut
 import fr.pillulier.app.usecase.HorlogeFigee
 import fr.pillulier.app.usecase.ProgrammateurEspion
 import fr.pillulier.app.usecase.ReArmerRappels
+import fr.pillulier.app.widget.RafraichirWidget
 import fr.pillulier.domain.Moment
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -67,6 +68,7 @@ class PreferencesViewModelTest {
                 programmateur = programmateur,
                 horloge = horloge,
             ),
+            rafraichirWidget = RafraichirWidget(contexte),
         )
     }
 

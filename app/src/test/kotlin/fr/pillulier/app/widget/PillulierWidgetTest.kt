@@ -17,6 +17,7 @@ import fr.pillulier.domain.Moment
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
+import java.time.LocalDate
 import java.time.LocalTime
 
 @RunWith(AndroidJUnit4::class)
@@ -49,6 +50,8 @@ class PillulierWidgetTest {
         }
     }
 
+    private val dateDuJour = LocalDate.of(2026, 1, 5)
+
     private fun ligneWidget(
         id: Long = 1L,
         nom: String = "Levothyrox",
@@ -64,6 +67,7 @@ class PillulierWidgetTest {
         heure = LocalTime.of(8, 0),
         enRetard = false,
         barree = barree,
+        date = if (barree) dateDuJour else null,
     )
 
     @Test
@@ -129,7 +133,7 @@ class PillulierWidgetTest {
                 parameters = actionParametersOf(
                     CLE_MEDICAMENT to 7L,
                     CLE_MOMENT to Moment.MATIN.name,
-                    CLE_DOSE to 1.0,
+                    CLE_DATE to dateDuJour.toString(),
                 ),
             ),
         ).assertExists()

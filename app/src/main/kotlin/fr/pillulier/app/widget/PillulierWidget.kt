@@ -55,7 +55,10 @@ object PillulierWidget : GlanceAppWidget() {
         val journee = acces.observerJournee()(horloge.aujourdhui())
 
         provideContent {
-            val lignes by journee.collectAsState(initial = emptyList())
+            // `initial = null` : sinon la première composition d'une session
+            // publie une liste vide et « Rien à prendre » clignote à chaque
+            // démarrage de session, même quand la journée est chargée.
+            val lignes by journee.collectAsState(initial = null)
             val annulable = lireAnnulable(currentState<Preferences>())
 
             val glanceId = LocalGlanceId.current
@@ -75,7 +78,10 @@ object PillulierWidget : GlanceAppWidget() {
             }
 
             GlanceTheme(colors = couleursWidget) {
-                ContenuWidget(lignesDuWidget(lignes, annulable, horloge.instant()))
+                // Tant que le flux n'a pas encore livré sa première valeur, on
+                // ne rend rien de définitif : l'`initialLayout` du système
+                // reste affiché plutôt qu'un « Rien à prendre » trompeur.
+                lignes?.let { ContenuWidget(lignesDuWidget(it, annulable, horloge.instant())) }
             }
         }
     }
@@ -124,11 +130,21 @@ fun ContenuWidget(lignes: List<LigneWidget>) {
 
 @Composable
 private fun LigneCochable(ligne: LigneWidget) {
-    val parametres = actionParametersOf(
+    val parametresCocher = actionParametersOf(
         CLE_MEDICAMENT to ligne.medicamentId,
         CLE_MOMENT to ligne.moment.name,
         CLE_DOSE to ligne.dose,
     )
+    // `ligne.date` n'est présent que sur une ligne barrée : c'est le jour de
+    // l'annulable, nécessaire pour qu'`ActionAnnuler` puisse revalider l'état
+    // au moment du clic plutôt que de recalculer « aujourd'hui ».
+    val parametresAnnuler = ligne.date?.let { date ->
+        actionParametersOf(
+            CLE_MEDICAMENT to ligne.medicamentId,
+            CLE_MOMENT to ligne.moment.name,
+            CLE_DATE to date.toString(),
+        )
+    }
 
     Row(
         // L'appui ailleurs que sur la case ouvre l'app : seule la case enregistre.
@@ -141,9 +157,9 @@ private fun LigneCochable(ligne: LigneWidget) {
         CheckBox(
             checked = ligne.barree,
             onCheckedChange = if (ligne.barree) {
-                actionRunCallback<ActionAnnuler>(parametres)
+                actionRunCallback<ActionAnnuler>(requireNotNull(parametresAnnuler))
             } else {
-                actionRunCallback<ActionCocher>(parametres)
+                actionRunCallback<ActionCocher>(parametresCocher)
             },
             text = "${ligne.nom} ${ligne.dosage}",
             style = TextStyle(
@@ -158,7 +174,9 @@ private fun LigneCochable(ligne: LigneWidget) {
             ),
             modifier = GlanceModifier
                 .padding(start = 8.dp)
-                .let { if (ligne.barree) it.clickable(actionRunCallback<ActionAnnuler>(parametres)) else it },
+                .let {
+                    if (ligne.barree) it.clickable(actionRunCallback<ActionAnnuler>(requireNotNull(parametresAnnuler))) else it
+                },
         )
     }
 }

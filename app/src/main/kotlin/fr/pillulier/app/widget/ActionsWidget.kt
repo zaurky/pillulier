@@ -8,10 +8,13 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.glance.GlanceId
 import androidx.glance.action.ActionParameters
 import androidx.glance.appwidget.action.ActionCallback
+import androidx.glance.appwidget.state.getAppWidgetState
 import androidx.glance.appwidget.state.updateAppWidgetState
+import androidx.glance.state.PreferencesGlanceStateDefinition
 import fr.pillulier.domain.CleRappel
 import fr.pillulier.domain.Moment
 import java.time.Instant
+import java.time.LocalDate
 
 private const val ETIQUETTE = "ActionsWidget"
 
@@ -21,35 +24,61 @@ const val SECONDES_ANNULATION = 10L
 val CLE_MEDICAMENT = ActionParameters.Key<Long>("medicamentId")
 val CLE_MOMENT = ActionParameters.Key<String>("moment")
 val CLE_DOSE = ActionParameters.Key<Double>("dose")
+val CLE_DATE = ActionParameters.Key<String>("date")
 
 val ETAT_MEDICAMENT = longPreferencesKey("annulable_medicament")
 val ETAT_MOMENT = stringPreferencesKey("annulable_moment")
+val ETAT_DATE = stringPreferencesKey("annulable_date")
 val ETAT_EXPIRATION = longPreferencesKey("annulable_expiration")
 
 /** L'annulable tel qu'il est relu de l'état Glance, ou `null` s'il n'y en a pas. */
 fun lireAnnulable(etat: Preferences): Annulable? {
     val medicamentId = etat[ETAT_MEDICAMENT] ?: return null
     val moment = etat[ETAT_MOMENT] ?: return null
+    val date = etat[ETAT_DATE] ?: return null
     val expiration = etat[ETAT_EXPIRATION] ?: return null
-    return Annulable(medicamentId, Moment.valueOf(moment), Instant.ofEpochMilli(expiration))
+    return Annulable(medicamentId, Moment.valueOf(moment), LocalDate.parse(date), Instant.ofEpochMilli(expiration))
 }
 
 /**
  * Écrit ou efface l'annulable de l'état Glance. `internal` : la Task 5 doit
- * pouvoir refermer la fenêtre d'annulation sans dupliquer ces trois `remove`.
+ * pouvoir refermer la fenêtre d'annulation sans dupliquer ces quatre `remove`.
  */
 internal suspend fun ecrireAnnulable(context: Context, glanceId: GlanceId, annulable: Annulable?) {
     updateAppWidgetState(context, glanceId) { etat ->
         if (annulable == null) {
             etat.remove(ETAT_MEDICAMENT)
             etat.remove(ETAT_MOMENT)
+            etat.remove(ETAT_DATE)
             etat.remove(ETAT_EXPIRATION)
         } else {
             etat[ETAT_MEDICAMENT] = annulable.medicamentId
             etat[ETAT_MOMENT] = annulable.moment.name
+            etat[ETAT_DATE] = annulable.date.toString()
             etat[ETAT_EXPIRATION] = annulable.expiration.toEpochMilli()
         }
     }
+}
+
+/**
+ * Vrai si l'annulable relu de l'état Glance est bien celui que ce clic cible :
+ * même prise, même jour, et fenêtre pas encore expirée. C'est la même vérité
+ * qu'au rendu (`lignesDuWidget`) et à l'action (`ActionAnnuler`) — sans elle,
+ * un clic sur une ligne barrée figée par une session Glance déjà morte
+ * pourrait annuler une prise qui n'est plus celle affichée à l'écran.
+ */
+fun annulationAutorisee(
+    annulable: Annulable?,
+    medicamentId: Long,
+    moment: Moment,
+    date: LocalDate,
+    maintenant: Instant,
+): Boolean {
+    if (annulable == null) return false
+    return annulable.medicamentId == medicamentId &&
+        annulable.moment == moment &&
+        annulable.date == date &&
+        annulable.expiration.isAfter(maintenant)
 }
 
 /** Enregistre la prise, exactement comme la coche de l'écran Aujourd'hui. */
@@ -60,35 +89,38 @@ class ActionCocher : ActionCallback {
         glanceId: GlanceId,
         parameters: ActionParameters,
     ) {
-        val medicamentId = parameters[CLE_MEDICAMENT] ?: return
-        val moment = parameters[CLE_MOMENT]?.let { Moment.valueOf(it) } ?: return
-        val dose = parameters[CLE_DOSE] ?: return
-        val acces = acces(context)
-        val horloge = acces.horloge()
-        val jour = horloge.aujourdhui()
-
         try {
+            val medicamentId = parameters[CLE_MEDICAMENT] ?: return
+            val moment = parameters[CLE_MOMENT]?.let { Moment.valueOf(it) } ?: return
+            val dose = parameters[CLE_DOSE] ?: return
+            val acces = acces(context)
+            val horloge = acces.horloge()
+            val jour = horloge.aujourdhui()
+
             acces.enregistrerPrise()(medicamentId, jour, moment, dose)
+            // Écrite tout de suite après l'enregistrement : sinon la ligne
+            // disparaît puis revient barrée, et la fenêtre de dix secondes
+            // démarre en retard sur ce qu'affiche déjà l'écran.
+            ecrireAnnulable(
+                context,
+                glanceId,
+                Annulable(medicamentId, moment, jour, horloge.instant().plusSeconds(SECONDES_ANNULATION)),
+            )
             // Le réarmement annule l'alarme mais pas la notification déjà
             // postée : celle d'une prise critique est `setOngoing`, donc
             // impossible à balayer.
             acces.notifications().retirer(CleRappel(medicamentId, jour, moment))
             acces.reArmerRappels()()
-            ecrireAnnulable(
-                context,
-                glanceId,
-                Annulable(medicamentId, moment, horloge.instant().plusSeconds(SECONDES_ANNULATION)),
-            )
             PillulierWidget.update(context, glanceId)
         } catch (erreur: Throwable) {
             // Une exception non rattrapée ici tuerait le processus depuis
             // l'arrière-plan : on la rend visible sans faire tomber l'app.
-            Log.e(ETIQUETTE, "coche impossible pour $medicamentId/$moment", erreur)
+            Log.e(ETIQUETTE, "coche impossible pour ${parameters[CLE_MEDICAMENT]}/${parameters[CLE_MOMENT]}", erreur)
         }
     }
 }
 
-/** Efface la prise et rend le stock, puis fait revenir l'alarme. */
+/** Efface la prise et rend le stock, puis fait revenir l'alarme — après revalidation. */
 class ActionAnnuler : ActionCallback {
 
     override suspend fun onAction(
@@ -96,18 +128,32 @@ class ActionAnnuler : ActionCallback {
         glanceId: GlanceId,
         parameters: ActionParameters,
     ) {
-        val medicamentId = parameters[CLE_MEDICAMENT] ?: return
-        val moment = parameters[CLE_MOMENT]?.let { Moment.valueOf(it) } ?: return
-        val acces = acces(context)
-        val jour = acces.horloge().aujourdhui()
-
         try {
-            acces.annulerPrise()(medicamentId, jour, moment)
+            val medicamentId = parameters[CLE_MEDICAMENT] ?: return
+            val moment = parameters[CLE_MOMENT]?.let { Moment.valueOf(it) } ?: return
+            val date = parameters[CLE_DATE]?.let { LocalDate.parse(it) } ?: return
+            val acces = acces(context)
+            val horloge = acces.horloge()
+
+            // La session Glance qui a rendu ce lien a pu mourir depuis : on
+            // relit l'état réel plutôt que de faire confiance aux pixels
+            // affichés, potentiellement figés depuis des heures.
+            val etat = getAppWidgetState(context, PreferencesGlanceStateDefinition, glanceId)
+            val annulable = lireAnnulable(etat)
+
+            if (!annulationAutorisee(annulable, medicamentId, moment, date, horloge.instant())) {
+                // Rien à annuler, ou plus la même prise : on se contente de
+                // redessiner le widget avec l'état réel, sans toucher à la base.
+                PillulierWidget.update(context, glanceId)
+                return
+            }
+
+            acces.annulerPrise()(medicamentId, date, moment)
             acces.reArmerRappels()()
             ecrireAnnulable(context, glanceId, annulable = null)
             PillulierWidget.update(context, glanceId)
         } catch (erreur: Throwable) {
-            Log.e(ETIQUETTE, "annulation impossible pour $medicamentId/$moment", erreur)
+            Log.e(ETIQUETTE, "annulation impossible pour ${parameters[CLE_MEDICAMENT]}/${parameters[CLE_MOMENT]}", erreur)
         }
     }
 }
