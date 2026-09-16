@@ -10,6 +10,7 @@ import fr.pillulier.app.data.DepotOrdonnances
 import fr.pillulier.app.data.db.PillulierDatabase
 import fr.pillulier.app.data.db.momentsParDefaut
 import fr.pillulier.app.rappels.Notifications
+import fr.pillulier.app.widget.RafraichirWidget
 import fr.pillulier.domain.CleRappel
 import fr.pillulier.domain.DosePrescrite
 import fr.pillulier.domain.Forme
@@ -59,13 +60,15 @@ class EnregistrerMedicamentTest {
             programmateur = programmateur,
             horloge = horloge,
         )
-        enregistrer = EnregistrerMedicament(medicaments, ordonnances, reArmer)
+        val rafraichirWidget = RafraichirWidget(ApplicationProvider.getApplicationContext())
+        enregistrer = EnregistrerMedicament(medicaments, ordonnances, reArmer, rafraichirWidget)
         supprimer = SupprimerMedicament(
             medicaments = medicaments,
             programmateur = programmateur,
             notifications = Notifications(ApplicationProvider.getApplicationContext()),
             reArmerRappels = reArmer,
             horloge = horloge,
+            rafraichirWidget = rafraichirWidget,
         )
     }
 

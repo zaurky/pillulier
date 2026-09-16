@@ -5,6 +5,7 @@ import fr.pillulier.app.data.DepotOrdonnances
 import fr.pillulier.app.rappels.Notifications
 import fr.pillulier.app.rappels.ProgrammateurAlarmes
 import fr.pillulier.app.temps.Horloge
+import fr.pillulier.app.widget.RafraichirWidget
 import fr.pillulier.domain.CleRappel
 import fr.pillulier.domain.DosePrescrite
 import fr.pillulier.domain.Medicament
@@ -23,6 +24,7 @@ class EnregistrerMedicament @Inject constructor(
     private val medicaments: DepotMedicaments,
     private val ordonnances: DepotOrdonnances,
     private val reArmerRappels: ReArmerRappels,
+    private val rafraichirWidget: RafraichirWidget,
 ) {
     suspend operator fun invoke(
         medicament: Medicament,
@@ -61,6 +63,7 @@ class EnregistrerMedicament @Inject constructor(
         )
 
         reArmerRappels()
+        rafraichirWidget()
         return id
     }
 }
@@ -77,6 +80,7 @@ class SupprimerMedicament @Inject constructor(
     private val notifications: Notifications,
     private val reArmerRappels: ReArmerRappels,
     private val horloge: Horloge,
+    private val rafraichirWidget: RafraichirWidget,
 ) {
     suspend operator fun invoke(medicamentId: Long) {
         val aujourdhui = horloge.aujourdhui()
@@ -91,5 +95,6 @@ class SupprimerMedicament @Inject constructor(
 
         medicaments.supprimer(medicamentId)
         reArmerRappels()
+        rafraichirWidget()
     }
 }

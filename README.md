@@ -36,6 +36,19 @@ jours fermés.
 | **Stock** | unités restantes, jours restants, dates d'épuisement et d'alerte, `+1 boîte` et correction manuelle |
 | **Préférences** | heures des quatre moments, délai du *Plus tard*, intervalle de relance, seuil d'alerte par défaut |
 
+### Le widget
+
+Un widget d'écran d'accueil liste les prises qu'il reste à faire aujourd'hui — en
+retard et à venir — et les rend cochables sans ouvrir l'application. Cocher enregistre
+la prise comme l'action *Pris* d'une notification : même transaction, même décrément de
+stock, même annulation d'alarme. Pendant dix secondes la ligne reste barrée avec un lien
+*Annuler*, qui efface la prise, rend le stock et fait revenir le rappel.
+
+Le widget lit `ObserverJournee`, donc le même `prisesAttendues` que les écrans : il
+calcule exactement la même chose qu'eux, et ne peut pas afficher autre chose. Mais sa
+session Glance est bornée dans le temps — son affichage peut dater d'avant le dernier
+rafraîchissement, le temps qu'un `updateAll` explicite le remette à jour.
+
 ### Posologies gérées
 
 Quatre moments globaux configurables (Matin, Midi, Soir, Coucher). Un rythme au choix :
@@ -92,6 +105,7 @@ pas.
 - `usecase/` — les écritures (prise, stock, médicament) et les lectures observables
 - `rappels/` — le programmateur d'alarmes exactes, les receveurs, les notifications, l'alarme plein écran, le travail quotidien
 - `ui/` — un sous-paquet par écran, chacun avec son ViewModel et son état en `StateFlow`
+- `widget/` — le widget Glance, ses deux actions et son point de rafraîchissement
 - `temps/` — l'abstraction d'horloge qui rend tout le reste testable
 
 Deux index uniques portent des garanties : celui sur `ordonnance(medicamentId)` impose
@@ -104,7 +118,7 @@ peuvent légitimement se répéter dans la journée.
 ## Construire et tester
 
 ```bash
-./gradlew :domain:test :app:testDebugUnitTest    # 144 tests, en JVM
+./gradlew :domain:test :app:testDebugUnitTest    # 161 tests, en JVM
 ./gradlew :app:assembleDebug                     # construire l'APK
 ./gradlew :app:installDebug                      # installer sur l'appareil branché
 ```
@@ -116,7 +130,7 @@ développement reste rapide.
 | Module | Tests |
 |---|---|
 | `:domain` | 50 |
-| `:app` | 94 |
+| `:app` | 111 |
 
 ## Stack
 

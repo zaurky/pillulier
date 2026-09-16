@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import fr.pillulier.domain.Moment
 import kotlinx.coroutines.flow.Flow
 import java.time.LocalDate
 
@@ -22,4 +23,16 @@ interface EvenementPriseDao {
 
     @Query("SELECT * FROM evenement_prise WHERE date = :date")
     suspend fun duJour(date: LocalDate): List<EvenementPriseEntity>
+
+    @Query(
+        "SELECT * FROM evenement_prise " +
+            "WHERE medicamentId = :medicamentId AND date = :date AND moment = :moment LIMIT 1",
+    )
+    suspend fun planifie(medicamentId: Long, date: LocalDate, moment: Moment): EvenementPriseEntity?
+
+    @Query(
+        "DELETE FROM evenement_prise " +
+            "WHERE medicamentId = :medicamentId AND date = :date AND moment = :moment",
+    )
+    suspend fun supprimerPlanifie(medicamentId: Long, date: LocalDate, moment: Moment)
 }

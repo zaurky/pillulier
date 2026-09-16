@@ -16,6 +16,7 @@ import fr.pillulier.app.usecase.HorlogeFigee
 import fr.pillulier.app.usecase.ProgrammateurEspion
 import fr.pillulier.app.usecase.ReArmerRappels
 import fr.pillulier.app.usecase.SupprimerMedicament
+import fr.pillulier.app.widget.RafraichirWidget
 import fr.pillulier.domain.Moment
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -67,16 +68,18 @@ class EditionViewModelTest {
             horloge = horloge,
         )
 
+        val rafraichirWidget = RafraichirWidget(contexte)
         vue = EditionViewModel(
             medicaments = medicaments,
             ordonnances = ordonnances,
-            enregistrerMedicament = EnregistrerMedicament(medicaments, ordonnances, reArmer),
+            enregistrerMedicament = EnregistrerMedicament(medicaments, ordonnances, reArmer, rafraichirWidget),
             supprimerMedicament = SupprimerMedicament(
                 medicaments = medicaments,
                 programmateur = ProgrammateurEspion(),
                 notifications = Notifications(contexte),
                 reArmerRappels = reArmer,
                 horloge = horloge,
+                rafraichirWidget = rafraichirWidget,
             ),
             horloge = horloge,
         )

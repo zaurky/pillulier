@@ -7,6 +7,7 @@ import fr.pillulier.app.data.DepotMoments
 import fr.pillulier.app.data.DepotPreferences
 import fr.pillulier.app.data.PreferencesPillulier
 import fr.pillulier.app.usecase.ReArmerRappels
+import fr.pillulier.app.widget.RafraichirWidget
 import fr.pillulier.domain.Moment
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.SharingStarted
@@ -27,6 +28,7 @@ class PreferencesViewModel @Inject constructor(
     private val moments: DepotMoments,
     private val preferences: DepotPreferences,
     private val reArmerRappels: ReArmerRappels,
+    private val rafraichirWidget: RafraichirWidget,
 ) : ViewModel() {
 
     val etat: StateFlow<EtatPreferences> = combine(
@@ -39,6 +41,7 @@ class PreferencesViewModel @Inject constructor(
     fun definirHeure(moment: Moment, heure: LocalTime): Job = viewModelScope.launch {
         moments.definir(moment, heure)
         reArmerRappels()
+        rafraichirWidget()
     }
 
     fun definirDelaiPlusTard(minutes: Int): Job = viewModelScope.launch {

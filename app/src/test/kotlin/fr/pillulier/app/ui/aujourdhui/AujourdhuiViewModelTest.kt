@@ -22,6 +22,7 @@ import fr.pillulier.app.usecase.ObserverJournee
 import fr.pillulier.app.usecase.ObserverStock
 import fr.pillulier.app.usecase.ProgrammateurEspion
 import fr.pillulier.app.usecase.ReArmerRappels
+import fr.pillulier.app.widget.RafraichirWidget
 import fr.pillulier.domain.CleRappel
 import fr.pillulier.domain.Forme
 import fr.pillulier.domain.Medicament
@@ -98,6 +99,7 @@ class AujourdhuiViewModelTest {
             ),
             notifications = notifications,
             horloge = horloge,
+            rafraichirWidget = RafraichirWidget(contexte),
         )
     }
 

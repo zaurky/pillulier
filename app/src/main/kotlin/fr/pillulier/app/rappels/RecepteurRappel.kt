@@ -9,6 +9,7 @@ import fr.pillulier.app.data.DepotMedicaments
 import fr.pillulier.app.data.DepotOrdonnances
 import fr.pillulier.app.data.DepotPreferences
 import fr.pillulier.app.temps.Horloge
+import fr.pillulier.app.widget.RafraichirWidget
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -30,6 +31,7 @@ class RecepteurRappel : BroadcastReceiver() {
     @Inject lateinit var notifications: Notifications
     @Inject lateinit var programmateur: ProgrammateurAlarmes
     @Inject lateinit var horloge: Horloge
+    @Inject lateinit var rafraichirWidget: RafraichirWidget
 
     override fun onReceive(context: Context, intent: Intent) {
         val cle = cleDepuisIntent(intent)
@@ -52,6 +54,7 @@ class RecepteurRappel : BroadcastReceiver() {
                     ?: return@launch
 
                 notifications.posterRappel(cle, medicament, dose, critique)
+                rafraichirWidget()
 
                 val intervalle = preferences.instantane().intervalleRelanceMinutes
                 programmateur.programmer(
