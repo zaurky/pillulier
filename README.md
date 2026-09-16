@@ -44,8 +44,10 @@ la prise comme l'action *Pris* d'une notification : même transaction, même dé
 stock, même annulation d'alarme. Pendant dix secondes la ligne reste barrée avec un lien
 *Annuler*, qui efface la prise, rend le stock et fait revenir le rappel.
 
-Le widget lit `ObserverJournee`, donc le même `prisesAttendues` que les écrans : il ne
-peut pas afficher autre chose qu'eux.
+Le widget lit `ObserverJournee`, donc le même `prisesAttendues` que les écrans : il
+calcule exactement la même chose qu'eux, et ne peut pas afficher autre chose. Mais sa
+session Glance est bornée dans le temps — son affichage peut dater d'avant le dernier
+rafraîchissement, le temps qu'un `updateAll` explicite le remette à jour.
 
 ### Posologies gérées
 

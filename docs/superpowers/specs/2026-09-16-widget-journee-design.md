@@ -69,18 +69,32 @@ l'application.
 Le widget est redimensionnable et la liste est une `LazyColumn`, donc une journée
 chargée défile au lieu d'être tronquée.
 
-L'appui sur une ligne ailleurs que sur sa case — et l'appui sur l'état vide — ouvre
-`MainActivity` sur l'écran Aujourd'hui. Seule la case à cocher enregistre.
+L'appui sur une ligne ailleurs que sur sa case — et l'appui sur l'état vide — lance
+`MainActivity`, ce qui ramène la tâche existante là où elle en était plutôt que de la
+réinitialiser sur l'écran Aujourd'hui : le comportement normal d'Android pour une
+activité déjà ouverte. Seule la case à cocher enregistre.
 
 ## Rafraîchissement
 
-Tant que la session Glance vit, toute écriture en base se propage seule au widget par le
-flux collecté : coche depuis l'écran Aujourd'hui, action *Pris* d'une notification,
-clôture quotidienne. `updateAll` n'est appelé explicitement que dans les trois cas que le
-flux ne couvre pas :
+Le flux collecté ne propage rien tout seul en pratique : une session Glance est bornée
+dans le temps (`TimeoutOptions` de Glance 1.2.0 — 45 s à l'ouverture, +5 s par
+événement, 5 s d'inactivité en Doze), et dans le cas courant aucune session ne tourne au
+moment où une prise est enregistrée depuis l'écran Aujourd'hui ou depuis une
+notification. Sans rafraîchissement explicite, le widget reste figé sur des pixels
+vieux de plusieurs heures.
+
+La règle est donc simple : **qui réarme les rappels rafraîchit le widget**, plus les
+deux cas où le temps change quelque chose sans écriture. `RafraichirWidget` appelle
+`PillulierWidget.updateAll`, sans effet (donc sans coût) quand aucun widget n'est posé.
 
 | Appelant | Pourquoi |
 |---|---|
+| `AujourdhuiViewModel.cocher` | la coche depuis l'écran Aujourd'hui change ce que la journée affiche |
+| `AujourdhuiViewModel.enregistrerALaDemande` | un chemin d'écriture de plus, par cohérence |
+| `RecepteurActionPrise` (*Pris*, *Plus tard*) | même écriture ou même report que depuis l'app |
+| `PreferencesViewModel.definirHeure` | une heure de moment déplace les lignes affichées |
+| `EnregistrerMedicament` | une ordonnance ou un médicament créé ou modifié change le planning |
+| `SupprimerMedicament` | un médicament supprimé disparaît du planning |
 | `TravailQuotidien` | la date `aujourd'hui` est capturée à la composition ; elle change à minuit |
 | `RecepteurRappel` | une prise passe `A_VENIR` → `EN_RETARD` par l'écoulement du temps, pas par une écriture |
 | `RecepteurDemarrage` | après `BOOT_COMPLETED` et `MY_PACKAGE_REPLACED` |
@@ -91,11 +105,13 @@ flux ne couvre pas :
 que fait `AujourdhuiViewModel.cocher` :
 
 1. `EnregistrerPrise(medicamentId, aujourd'hui, moment, dose)`
-2. `Notifications.retirer(CleRappel(medicamentId, aujourd'hui, moment))` — la
+2. écriture de l'annulable dans l'état Glance, tout de suite après l'enregistrement —
+   sinon la ligne disparaît puis revient barrée, et la fenêtre de dix secondes démarre
+   en retard sur ce que l'écran affiche déjà
+3. `Notifications.retirer(CleRappel(medicamentId, aujourd'hui, moment))` — la
    notification d'une prise critique est `setOngoing`, donc impossible à balayer, et
    resterait affichée jusqu'à la clôture
-3. `ReArmerRappels()`
-4. écriture de l'annulable dans l'état Glance, puis `update()`
+4. `ReArmerRappels()`, puis `update()`
 
 ## Annuler
 
@@ -105,7 +121,16 @@ que fait `AujourdhuiViewModel.cocher` :
 ajustée re-créditerait faux. Elle renvoie `false` si aucun événement n'existait, ce qui
 rend le double appui inoffensif.
 
-`ActionAnnuler` l'appelle, puis `ReArmerRappels()` et efface l'annulable.
+Avant d'appeler `AnnulerPrise`, `ActionAnnuler` relit l'état persisté du widget
+(`getAppWidgetState`) et vérifie que l'annulable qui s'y trouve désigne exactement la
+même prise que le clic — même médicament, même moment, même jour — et n'est pas expiré.
+Une session Glance ne vit que quelques dizaines de secondes : sans cette revalidation,
+un widget dont la session est morte reste figé sur une ligne barrée avec un lien
+*Annuler* tapable indéfiniment, et l'appui recalculerait « aujourd'hui » au lieu du jour
+réel de la prise — risquant d'effacer une prise d'un autre jour. Si la revalidation
+échoue, aucune écriture n'a lieu : le widget est simplement redessiné avec l'état réel.
+Sinon, `ActionAnnuler` appelle `AnnulerPrise`, puis `ReArmerRappels()` et efface
+l'annulable.
 
 Le réarmement fait revenir l'alarme. Comme `ReArmerRappels` reprogramme une prise du jour
 déjà due à `maintenant + 1 min`, annuler une coche faite en retard fait resonner le
@@ -114,8 +139,10 @@ faite, donc elle doit être rappelée — mais c'est un comportement visible, pa
 
 ## L'annulable et sa fenêtre de dix secondes
 
-L'état Glance du widget porte un `annulable` : `medicamentId`, `moment`, et un instant
-d'**expiration absolu**.
+L'état Glance du widget porte un `annulable` : `medicamentId`, `moment`, la `date`
+exacte de la prise enregistrée, et un instant d'**expiration absolu**. La date est
+nécessaire à `ActionAnnuler` : sans elle, recalculer « aujourd'hui » au moment du clic
+viserait le jour suivant si le clic tombe après minuit.
 
 Le rendu part des lignes du jour et garde :
 
@@ -142,7 +169,7 @@ périmé est ignoré au retour. Pas de ligne barrée fantôme.
 | Redémarrage du téléphone | même chemin, sur `BOOT_COMPLETED` |
 | Widget retiré | le nettoyage de l'état est celui de `GlanceAppWidgetReceiver` ; rien de propre à l'application à libérer |
 | Plusieurs widgets posés | l'annulable est **par instance** : cocher sur l'un fait disparaître la ligne de l'autre sans fenêtre d'annulation. Comportement assumé ; un état partagé coûterait plus qu'il ne rapporte |
-| Doze, tâche différée | le widget ne programme aucun travail ; `updateAll` part de receveurs qui tournent déjà |
+| Doze, tâche différée | chaque session Glance est un `SessionWorker` WorkManager, et un `updateAll` peut lui-même être différé en Doze : la mise à jour n'est pas instantanée, seulement rattrapée au réveil |
 
 Une exception dans une `ActionCallback` est attrapée et loguée, comme dans
 `RecepteurActionPrise` : une exception non rattrapée depuis l'arrière-plan tuerait le
