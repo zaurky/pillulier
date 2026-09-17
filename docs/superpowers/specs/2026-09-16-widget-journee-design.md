@@ -101,10 +101,22 @@ deux cas où le temps change quelque chose sans écriture. `RafraichirWidget` ap
 
 ## Cocher
 
-`ActionCocher`, paramétrée par `medicamentId`, `moment` et `dose`, refait exactement ce
-que fait `AujourdhuiViewModel.cocher` :
+`ActionCocher` est paramétrée par `medicamentId`, `moment` et **le jour que le rendu
+représente**. Les pixels d'un widget peuvent dater de plusieurs heures : avant d'écrire
+quoi que ce soit, elle revalide, comme `ActionAnnuler`.
 
-1. `EnregistrerPrise(medicamentId, aujourd'hui, moment, dose)`
+1. si le jour du rendu n'est plus le jour courant, elle n'écrit rien et se contente d'un
+   `update()` — sans cette garde, un appui sur un widget figé depuis la veille
+   enregistrerait une prise du jour courant pour un couple qui n'y est peut-être plus
+2. elle relit le planning du jour (`ObserverJournee`) et cherche ce `(médicament,
+   moment)` parmi les prises encore attendues, `EN_RETARD` ou `A_VENIR` ; s'il n'y est
+   plus, même refus silencieux. La décision sort en fonction pure, `priseACocher`
+3. la **dose vient de ce planning relu**, jamais de celle gravée dans le rendu : une
+   ordonnance modifiée depuis décrémenterait le stock du mauvais montant
+
+Puis elle refait exactement ce que fait `AujourdhuiViewModel.cocher` :
+
+1. `EnregistrerPrise(medicamentId, aujourd'hui, moment, dose courante)`
 2. écriture de l'annulable dans l'état Glance, tout de suite après l'enregistrement —
    sinon la ligne disparaît puis revient barrée, et la fenêtre de dix secondes démarre
    en retard sur ce que l'écran affiche déjà
@@ -152,10 +164,12 @@ EN_RETARD ∪ A_VENIR ∪ { la ligne annulable dont l'expiration n'est pas dépa
 
 La ligne cochée est passée `PRISE`, donc sortie du filtre : il faut la réinjecter pour
 l'afficher barrée, avec un lien *Annuler* à la place de la case. Cette règle est une
-fonction pure, `lignesDuWidget(lignes, annulable, maintenant)`, isolée de Glance et
+fonction pure, `lignesDuWidget(lignes, annulable, jour, maintenant)`, isolée de Glance et
 testée seule.
 
-La fenêtre se referme par un `delay` dans la composition, qui efface l'annulable. Cet
+La fenêtre est bornée trois fois : par un `delay` dans la composition, qui efface
+l'annulable ; par la vérification d'expiration au rendu ; et par la revalidation à
+l'action, seule à tenir quand la session Glance qui a dessiné le lien est déjà morte. Cet
 effacement est doublé par la vérification d'expiration au rendu, et c'est ce doublage qui
 rend le cas « processus tué » correct : l'état Glance est persisté, mais un annulable
 périmé est ignoré au retour. Pas de ligne barrée fantôme.
@@ -182,7 +196,8 @@ Tous en JVM, sans émulateur.
 | Test | Ce qu'il verrouille |
 |---|---|
 | `AnnulerPriseTest` (Room en mémoire, Robolectric) | suppression de l'événement, re-crédit de la dose **réelle**, `false` si rien à annuler, double appui sans effet |
-| `LignesDuWidgetTest` (Kotlin pur) | filtre `EN_RETARD`/`A_VENIR`, réinjection de l'annulable, annulable expiré ignoré, journée vide |
+| `LignesDuWidgetTest` (Kotlin pur) | filtre `EN_RETARD`/`A_VENIR`, réinjection de l'annulable, annulable expiré ignoré, journée vide, jour du rendu porté par chaque ligne |
+| `ActionsWidgetTest` (Kotlin pur) | les deux revalidations : `annulationAutorisee` (annulable absent, expiré, autre jour, autre prise) et `priseACocher` (couple disparu du planning, prise déjà faite ou oubliée, dose courante et non celle du rendu) |
 | `PillulierWidgetTest` (`runGlanceAppWidgetUnitTest`) | la liste rendue et son groupement, la ligne barrée avec *Annuler*, l'état vide « Rien à prendre » |
 
 `prisesAttendues`, `statut` et `EnregistrerPrise` sont déjà couverts et ne sont pas

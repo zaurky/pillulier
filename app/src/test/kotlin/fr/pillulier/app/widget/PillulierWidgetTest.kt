@@ -67,7 +67,7 @@ class PillulierWidgetTest {
         heure = LocalTime.of(8, 0),
         enRetard = false,
         barree = barree,
-        date = if (barree) dateDuJour else null,
+        date = dateDuJour,
     )
 
     @Test
@@ -102,7 +102,7 @@ class PillulierWidgetTest {
     }
 
     @Test
-    fun `cocher une prise declenche l action de coche avec sa dose`() = runGlanceAppWidgetUnitTest {
+    fun `cocher une prise declenche l action de coche avec le jour du rendu`() = runGlanceAppWidgetUnitTest {
         provideComposable { ContenuWidget(lignes = listOf(ligneWidget(id = 7L))) }
 
         onNode(
@@ -111,7 +111,7 @@ class PillulierWidgetTest {
                 parameters = actionParametersOf(
                     CLE_MEDICAMENT to 7L,
                     CLE_MOMENT to Moment.MATIN.name,
-                    CLE_DOSE to 1.0,
+                    CLE_DATE to dateDuJour.toString(),
                 ),
             ),
         ).assertExists()

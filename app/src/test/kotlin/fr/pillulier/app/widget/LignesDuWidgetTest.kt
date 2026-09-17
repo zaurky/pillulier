@@ -8,7 +8,6 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
 import kotlin.test.assertEquals
-import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LignesDuWidgetTest {
@@ -40,10 +39,10 @@ class LignesDuWidgetTest {
             ligne(4, statut = StatutPrise.OUBLIEE),
         )
 
-        val gardees = lignesDuWidget(lignes, annulable = null, maintenant = maintenant)
+        val gardees = lignesDuWidget(lignes, annulable = null, jour = aujourdhui, maintenant = maintenant)
 
         assertEquals(listOf(1L, 2L), gardees.map { it.medicamentId })
-        assertTrue(gardees.all { it.date == null }, "une ligne non annulable n'a pas de date")
+        assertTrue(gardees.all { it.date == aujourdhui }, "chaque ligne porte le jour rendu")
     }
 
     @Test
@@ -51,6 +50,7 @@ class LignesDuWidgetTest {
         val gardees = lignesDuWidget(
             listOf(ligne(1, statut = StatutPrise.EN_RETARD), ligne(2, statut = StatutPrise.A_VENIR)),
             annulable = null,
+            jour = aujourdhui,
             maintenant = maintenant,
         )
 
@@ -63,7 +63,7 @@ class LignesDuWidgetTest {
         val lignes = listOf(ligne(3, statut = StatutPrise.PRISE))
         val annulable = Annulable(3L, Moment.MATIN, aujourdhui, maintenant.plusSeconds(7))
 
-        val gardees = lignesDuWidget(lignes, annulable, maintenant)
+        val gardees = lignesDuWidget(lignes, annulable, aujourdhui, maintenant)
 
         assertEquals(1, gardees.size)
         assertTrue(gardees.single().barree)
@@ -75,7 +75,7 @@ class LignesDuWidgetTest {
         val lignes = listOf(ligne(3, statut = StatutPrise.PRISE))
         val annulable = Annulable(3L, Moment.MATIN, aujourdhui, maintenant.minusSeconds(1))
 
-        assertTrue(lignesDuWidget(lignes, annulable, maintenant).isEmpty())
+        assertTrue(lignesDuWidget(lignes, annulable, aujourdhui, maintenant).isEmpty())
     }
 
     @Test
@@ -83,22 +83,37 @@ class LignesDuWidgetTest {
         val lignes = listOf(ligne(3, moment = Moment.MATIN, statut = StatutPrise.PRISE))
         val annulable = Annulable(3L, Moment.SOIR, aujourdhui, maintenant.plusSeconds(7))
 
-        assertTrue(lignesDuWidget(lignes, annulable, maintenant).isEmpty())
+        assertTrue(lignesDuWidget(lignes, annulable, aujourdhui, maintenant).isEmpty())
     }
 
     @Test
-    fun `une ligne non barree ne porte pas de date`() {
+    fun `une ligne non barree porte elle aussi le jour rendu`() {
         val gardees = lignesDuWidget(
             listOf(ligne(1, statut = StatutPrise.EN_RETARD)),
             annulable = null,
+            jour = aujourdhui,
             maintenant = maintenant,
         )
 
-        assertNull(gardees.single().date)
+        assertEquals(aujourdhui, gardees.single().date)
     }
 
     @Test
     fun `une journee sans prise donne une liste vide`() {
-        assertTrue(lignesDuWidget(emptyList(), annulable = null, maintenant = maintenant).isEmpty())
+        assertTrue(lignesDuWidget(emptyList(), annulable = null, jour = aujourdhui, maintenant = maintenant).isEmpty())
+    }
+
+    @Test
+    fun `une ligne barree garde la date de l annulable meme apres minuit`() {
+        // La session a commencé hier ; il est minuit passé et la fenêtre de dix
+        // secondes court encore. L'annulation doit désigner la prise d'hier,
+        // pas celle du jour qui vient de commencer.
+        val hier = aujourdhui.minusDays(1)
+        val lignes = listOf(ligne(3, statut = StatutPrise.PRISE))
+        val annulable = Annulable(3L, Moment.MATIN, hier, maintenant.plusSeconds(7))
+
+        val gardees = lignesDuWidget(lignes, annulable, aujourdhui, maintenant)
+
+        assertEquals(hier, gardees.single().date)
     }
 }
