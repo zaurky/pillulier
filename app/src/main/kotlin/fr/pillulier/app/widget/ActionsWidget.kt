@@ -11,10 +11,13 @@ import androidx.glance.appwidget.action.ActionCallback
 import androidx.glance.appwidget.state.getAppWidgetState
 import androidx.glance.appwidget.state.updateAppWidgetState
 import androidx.glance.state.PreferencesGlanceStateDefinition
+import fr.pillulier.app.usecase.LigneJournee
 import fr.pillulier.domain.CleRappel
 import fr.pillulier.domain.Moment
+import fr.pillulier.domain.StatutPrise
 import java.time.Instant
 import java.time.LocalDate
+import kotlinx.coroutines.flow.first
 
 private const val ETIQUETTE = "ActionsWidget"
 
@@ -23,7 +26,6 @@ const val SECONDES_ANNULATION = 10L
 
 val CLE_MEDICAMENT = ActionParameters.Key<Long>("medicamentId")
 val CLE_MOMENT = ActionParameters.Key<String>("moment")
-val CLE_DOSE = ActionParameters.Key<Double>("dose")
 val CLE_DATE = ActionParameters.Key<String>("date")
 
 val ETAT_MEDICAMENT = longPreferencesKey("annulable_medicament")
@@ -81,7 +83,23 @@ fun annulationAutorisee(
         annulable.expiration.isAfter(maintenant)
 }
 
-/** Enregistre la prise, exactement comme la coche de l'écran Aujourd'hui. */
+/**
+ * La prise que ce clic cible, si elle est encore attendue aujourd'hui — sinon
+ * `null`. Les pixels d'un widget peuvent dater de plusieurs heures : le couple
+ * coché peut avoir disparu du planning, ou changé de dose, depuis le rendu.
+ * C'est `prisesAttendues`, relu à l'instant du clic, qui tranche.
+ */
+fun priseACocher(
+    lignes: List<LigneJournee>,
+    medicamentId: Long,
+    moment: Moment,
+): LigneJournee? = lignes.firstOrNull { ligne ->
+    ligne.medicamentId == medicamentId &&
+        ligne.moment == moment &&
+        (ligne.statut == StatutPrise.A_VENIR || ligne.statut == StatutPrise.EN_RETARD)
+}
+
+/** Enregistre la prise, exactement comme la coche de l'écran Aujourd'hui — après revalidation. */
 class ActionCocher : ActionCallback {
 
     override suspend fun onAction(
@@ -92,12 +110,28 @@ class ActionCocher : ActionCallback {
         try {
             val medicamentId = parameters[CLE_MEDICAMENT] ?: return
             val moment = parameters[CLE_MOMENT]?.let { Moment.valueOf(it) } ?: return
-            val dose = parameters[CLE_DOSE] ?: return
+            val rendueLe = parameters[CLE_DATE]?.let { LocalDate.parse(it) } ?: return
             val acces = acces(context)
             val horloge = acces.horloge()
             val jour = horloge.aujourdhui()
 
-            acces.enregistrerPrise()(medicamentId, jour, moment, dose)
+            // La session Glance qui a dessiné cette case a pu mourir depuis.
+            // Un rendu d'hier cocherait sinon une prise du jour courant, pour
+            // un couple qui n'est peut-être plus au planning.
+            if (rendueLe != jour) {
+                PillulierWidget.update(context, glanceId)
+                return
+            }
+
+            // La dose vient du planning relu maintenant, jamais de celle gravée
+            // au rendu : une ordonnance modifiée depuis décrémenterait faux.
+            val prise = priseACocher(acces.observerJournee()(jour).first(), medicamentId, moment)
+            if (prise == null) {
+                PillulierWidget.update(context, glanceId)
+                return
+            }
+
+            acces.enregistrerPrise()(medicamentId, jour, moment, prise.dose)
             // Écrite tout de suite après l'enregistrement : sinon la ligne
             // disparaît puis revient barrée, et la fenêtre de dix secondes
             // démarre en retard sur ce qu'affiche déjà l'écran.

@@ -31,8 +31,12 @@ data class LigneWidget(
     val heure: LocalTime,
     val enRetard: Boolean,
     val barree: Boolean,
-    /** Le jour de l'annulable, présent seulement quand `barree` : seule l'annulation en a besoin. */
-    val date: LocalDate?,
+    /**
+     * Le jour que ce rendu représente. Il voyage jusqu'aux deux actions, qui
+     * refusent d'agir si ce n'est plus le jour courant : un widget peut
+     * afficher des pixels figés depuis la veille.
+     */
+    val date: LocalDate,
 )
 
 /**
@@ -47,6 +51,7 @@ data class LigneWidget(
 fun lignesDuWidget(
     lignes: List<LigneJournee>,
     annulable: Annulable?,
+    jour: LocalDate,
     maintenant: Instant,
 ): List<LigneWidget> {
     val ouvert = annulable?.takeIf { it.expiration.isAfter(maintenant) }
@@ -63,7 +68,6 @@ fun lignesDuWidget(
             }
         }
         .map { ligne ->
-            val barree = ligne.statut == StatutPrise.PRISE
             LigneWidget(
                 medicamentId = ligne.medicamentId,
                 moment = ligne.moment,
@@ -73,8 +77,8 @@ fun lignesDuWidget(
                 dose = ligne.dose,
                 heure = ligne.heure,
                 enRetard = ligne.statut == StatutPrise.EN_RETARD,
-                barree = barree,
-                date = if (barree) ouvert?.date else null,
+                barree = ligne.statut == StatutPrise.PRISE,
+                date = jour,
             )
         }
 }
