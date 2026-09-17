@@ -102,4 +102,18 @@ class LignesDuWidgetTest {
     fun `une journee sans prise donne une liste vide`() {
         assertTrue(lignesDuWidget(emptyList(), annulable = null, jour = aujourdhui, maintenant = maintenant).isEmpty())
     }
+
+    @Test
+    fun `une ligne barree garde la date de l annulable meme apres minuit`() {
+        // La session a commencé hier ; il est minuit passé et la fenêtre de dix
+        // secondes court encore. L'annulation doit désigner la prise d'hier,
+        // pas celle du jour qui vient de commencer.
+        val hier = aujourdhui.minusDays(1)
+        val lignes = listOf(ligne(3, statut = StatutPrise.PRISE))
+        val annulable = Annulable(3L, Moment.MATIN, hier, maintenant.plusSeconds(7))
+
+        val gardees = lignesDuWidget(lignes, annulable, aujourdhui, maintenant)
+
+        assertEquals(hier, gardees.single().date)
+    }
 }

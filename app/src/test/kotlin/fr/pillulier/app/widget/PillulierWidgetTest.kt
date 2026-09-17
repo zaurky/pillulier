@@ -102,7 +102,7 @@ class PillulierWidgetTest {
     }
 
     @Test
-    fun `cocher une prise declenche l action de coche avec sa dose`() = runGlanceAppWidgetUnitTest {
+    fun `cocher une prise declenche l action de coche avec le jour du rendu`() = runGlanceAppWidgetUnitTest {
         provideComposable { ContenuWidget(lignes = listOf(ligneWidget(id = 7L))) }
 
         onNode(

@@ -32,9 +32,10 @@ data class LigneWidget(
     val enRetard: Boolean,
     val barree: Boolean,
     /**
-     * Le jour que ce rendu représente. Il voyage jusqu'aux deux actions, qui
-     * refusent d'agir si ce n'est plus le jour courant : un widget peut
-     * afficher des pixels figés depuis la veille.
+     * Le jour que cette ligne désigne : celui du rendu, ou celui de l'annulable
+     * quand la ligne est barrée. Il voyage jusqu'aux deux actions, qui refusent
+     * d'agir s'il ne correspond plus — un widget peut afficher des pixels figés
+     * depuis la veille.
      */
     val date: LocalDate,
 )
@@ -78,7 +79,10 @@ fun lignesDuWidget(
                 heure = ligne.heure,
                 enRetard = ligne.statut == StatutPrise.EN_RETARD,
                 barree = ligne.statut == StatutPrise.PRISE,
-                date = jour,
+                // Une ligne barrée porte la date exacte de l'annulable persisté,
+                // pas le jour recalculé : si la fenêtre de dix secondes chevauche
+                // minuit, l'annulation doit encore désigner la prise de la veille.
+                date = if (ligne.statut == StatutPrise.PRISE) ouvert?.date ?: jour else jour,
             )
         }
 }

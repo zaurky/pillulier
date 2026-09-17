@@ -164,7 +164,7 @@ EN_RETARD ∪ A_VENIR ∪ { la ligne annulable dont l'expiration n'est pas dépa
 
 La ligne cochée est passée `PRISE`, donc sortie du filtre : il faut la réinjecter pour
 l'afficher barrée, avec un lien *Annuler* à la place de la case. Cette règle est une
-fonction pure, `lignesDuWidget(lignes, annulable, maintenant)`, isolée de Glance et
+fonction pure, `lignesDuWidget(lignes, annulable, jour, maintenant)`, isolée de Glance et
 testée seule.
 
 La fenêtre est bornée trois fois : par un `delay` dans la composition, qui efface
