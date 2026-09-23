@@ -33,6 +33,8 @@ data class EtatEdition(
     val critique: Boolean = false,
     val type: TypeOrdonnance = TypeOrdonnance.PLANIFIEE,
     val rythme: Rythme = Rythme.TousLesJours,
+    /** Texte brut du champ « un jour sur N » ; `rythme` ne peut pas porter une saisie en cours. */
+    val intervalleJours: String = "2",
     val dateDebut: LocalDate = LocalDate.now(),
     val dateFin: LocalDate? = null,
     val doses: Map<Moment, Double> = emptyMap(),
@@ -79,6 +81,8 @@ class EditionViewModel @Inject constructor(
             critique = medicament.critique,
             type = ordonnance?.ordonnance?.type ?: TypeOrdonnance.PLANIFIEE,
             rythme = ordonnance?.ordonnance?.rythme ?: Rythme.TousLesJours,
+            intervalleJours = (ordonnance?.ordonnance?.rythme as? Rythme.UnJourSurN)
+                ?.n?.toString() ?: "2",
             dateDebut = ordonnance?.ordonnance?.dateDebut ?: horloge.aujourdhui(),
             dateFin = ordonnance?.ordonnance?.dateFin,
             doses = ordonnance?.doses?.associate { it.moment to it.dose } ?: emptyMap(),
@@ -109,8 +113,20 @@ class EditionViewModel @Inject constructor(
         )
     }
 
-    fun choisirUnJourSurN(n: Int) = _etat.update {
-        it.copy(rythme = if (n >= 2) Rythme.UnJourSurN(n) else Rythme.TousLesJours)
+    fun choisirUnJourSurN() = _etat.update {
+        it.copy(rythme = Rythme.UnJourSurN(it.intervalleJours.toIntOrNull()?.takeIf(::intervalleValide) ?: 2))
+    }
+
+    /**
+     * Le champ garde la saisie telle quelle ; le rythme ne suit que si elle se
+     * lit, parce que `UnJourSurN` refuse un N inférieur à deux.
+     */
+    fun modifierIntervalle(valeur: String) = _etat.update { etat ->
+        val n = valeur.toIntOrNull()
+        etat.copy(
+            intervalleJours = valeur,
+            rythme = if (n != null && intervalleValide(n)) Rythme.UnJourSurN(n) else etat.rythme,
+        )
     }
 
     /** Une dose nulle retire le moment de l'ordonnance. */
@@ -135,6 +151,12 @@ class EditionViewModel @Inject constructor(
         }
         if (etat.stockUnites.isNotBlank() && stockUnites == null) {
             _etat.update { it.copy(erreur = "Stock : nombre illisible") }
+            return@launch
+        }
+        if (etat.rythme is Rythme.UnJourSurN &&
+            etat.intervalleJours.toIntOrNull()?.let(::intervalleValide) != true
+        ) {
+            _etat.update { it.copy(erreur = "Un jour sur : au moins 2 jours") }
             return@launch
         }
 
@@ -169,3 +191,5 @@ class EditionViewModel @Inject constructor(
         _etat.update { it.copy(enregistre = true) }
     }
 }
+
+private fun intervalleValide(n: Int): Boolean = n >= 2

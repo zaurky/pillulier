@@ -18,6 +18,7 @@ import fr.pillulier.app.usecase.ReArmerRappels
 import fr.pillulier.app.usecase.SupprimerMedicament
 import fr.pillulier.app.widget.RafraichirWidget
 import fr.pillulier.domain.Moment
+import fr.pillulier.domain.Rythme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -43,6 +44,7 @@ class EditionViewModelTest {
     private lateinit var contexte: Context
     private lateinit var base: PillulierDatabase
     private lateinit var medicaments: DepotMedicaments
+    private lateinit var ordonnances: DepotOrdonnances
     private lateinit var vue: EditionViewModel
     private val horloge = HorlogeFigee(LocalDateTime.of(2026, 1, 5, 7, 0))
 
@@ -58,7 +60,7 @@ class EditionViewModelTest {
             .build()
 
         medicaments = DepotMedicaments(base.medicaments())
-        val ordonnances = DepotOrdonnances(base.ordonnances())
+        ordonnances = DepotOrdonnances(base.ordonnances())
         val reArmer = ReArmerRappels(
             ordonnances = ordonnances,
             medicaments = medicaments,
@@ -149,5 +151,45 @@ class EditionViewModelTest {
         vue.charger(id).join()
 
         assertEquals("Levothyrox 100", vue.etat.value.nom)
+    }
+
+    @Test
+    fun `un intervalle de trois jours enregistre un jour sur trois`() = runTest {
+        remplirFormulaireValide()
+        vue.choisirUnJourSurN()
+        vue.modifierIntervalle("3")
+
+        vue.enregistrer().join()
+
+        assertNull(vue.etat.value.erreur)
+        val id = medicaments.tous().single().id
+        assertEquals(Rythme.UnJourSurN(3), ordonnances.pourMedicament(id)?.ordonnance?.rythme)
+    }
+
+    @Test
+    fun `un intervalle illisible affiche une erreur et n enregistre rien`() = runTest {
+        remplirFormulaireValide()
+        vue.choisirUnJourSurN()
+        vue.modifierIntervalle("trois")
+
+        vue.enregistrer().join()
+
+        assertNotNull(vue.etat.value.erreur, "une saisie illisible doit etre signalee")
+        assertTrue(medicaments.tous().isEmpty(), "rien ne doit etre ecrit en base")
+        assertEquals(false, vue.etat.value.enregistre)
+    }
+
+    @Test
+    fun `charger repeuple le champ intervalle depuis l ordonnance`() = runTest {
+        remplirFormulaireValide()
+        vue.choisirUnJourSurN()
+        vue.modifierIntervalle("4")
+        vue.enregistrer().join()
+        val id = medicaments.tous().single().id
+
+        vue.charger(id).join()
+
+        assertEquals("4", vue.etat.value.intervalleJours)
+        assertEquals(Rythme.UnJourSurN(4), vue.etat.value.rythme)
     }
 }
