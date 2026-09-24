@@ -46,6 +46,8 @@ class EditionViewModelTest {
     private lateinit var base: PillulierDatabase
     private lateinit var medicaments: DepotMedicaments
     private lateinit var ordonnances: DepotOrdonnances
+    private lateinit var creer: EnregistrerMedicament
+    private lateinit var archive: ArchiverMedicament
     private lateinit var vue: EditionViewModel
     private val horloge = HorlogeFigee(LocalDateTime.of(2026, 1, 5, 7, 0))
 
@@ -72,19 +74,30 @@ class EditionViewModelTest {
         )
 
         val rafraichirWidget = RafraichirWidget(contexte)
+        creer = EnregistrerMedicament(medicaments, ordonnances, reArmer, rafraichirWidget)
+        archive = ArchiverMedicament(
+            medicaments = medicaments,
+            ordonnances = ordonnances,
+            programmateur = ProgrammateurEspion(),
+            notifications = Notifications(contexte),
+            reArmerRappels = reArmer,
+            horloge = horloge,
+            rafraichirWidget = rafraichirWidget,
+        )
+
+        creerVue()
+    }
+
+    /**
+     * `charger` ne s execute qu une fois par vue, par construction : rouvrir
+     * l ecran passe donc par une nouvelle vue, comme dans l application.
+     */
+    private fun creerVue() {
         vue = EditionViewModel(
             medicaments = medicaments,
             ordonnances = ordonnances,
-            enregistrerMedicament = EnregistrerMedicament(medicaments, ordonnances, reArmer, rafraichirWidget),
-            archiverMedicament = ArchiverMedicament(
-                medicaments = medicaments,
-                ordonnances = ordonnances,
-                programmateur = ProgrammateurEspion(),
-                notifications = Notifications(contexte),
-                reArmerRappels = reArmer,
-                horloge = horloge,
-                rafraichirWidget = rafraichirWidget,
-            ),
+            enregistrerMedicament = creer,
+            archiverMedicament = archive,
             horloge = horloge,
         )
     }
@@ -247,6 +260,85 @@ class EditionViewModelTest {
             horloge.aujourdhui(),
             vue.etat.value.dateEffet,
             "la date d effet doit repartir d aujourd hui, pas de la date de debut relue en base",
+        )
+    }
+
+    @Test
+    fun `renommer un traitement date du futur n exige pas de toucher aux dates`() = runTest {
+        // Creation le 5 janvier d un traitement qui ne demarre que le 1er fevrier.
+        remplirFormulaireValide()
+        vue.modifierDateDebut(LocalDate.of(2026, 2, 1))
+        vue.enregistrer().join()
+        val id = medicaments.tous().single().id
+
+        // On rouvre l ecran le jour meme pour corriger une faute de frappe :
+        // `charger` relit la date de debut de la version a venir, tandis que la
+        // date d effet repart d aujourd hui.
+        creerVue()
+        vue.charger(id).join()
+        vue.modifierNom("Levothyrox 100")
+        vue.enregistrer().join()
+
+        assertNull(vue.etat.value.erreur, "un simple renommage ne doit rien exiger d autre")
+        assertEquals("Levothyrox 100", medicaments.parId(id)!!.nom)
+        assertEquals(
+            LocalDate.of(2026, 2, 1),
+            ordonnances.versionsDe(id).single().ordonnance.dateDebut,
+            "le debut du traitement ne doit pas avoir bouge",
+        )
+    }
+
+    @Test
+    fun `une seconde correction retroactive peut remonter avant la version courante`() = runTest {
+        // Traitement quotidien depuis le 1er janvier.
+        remplirFormulaireValide()
+        vue.modifierDateDebut(LocalDate.of(2026, 1, 1))
+        vue.enregistrer().join()
+        val id = medicaments.tous().single().id
+
+        // Le 5 : une premiere correction, effective le jour meme.
+        creerVue()
+        vue.charger(id).join()
+        vue.definirDose(Moment.SOIR, 2.0)
+        vue.enregistrer().join()
+        assertNull(vue.etat.value.erreur)
+
+        // Le 6 : en fait la prescription s appliquait depuis le 3. `charger`
+        // vient de relire la date de debut de la version courante (le 5), qui
+        // n est pas le debut du traitement et ne doit rien interdire.
+        horloge.avancerA(LocalDateTime.of(2026, 1, 6, 7, 0))
+        creerVue()
+        vue.charger(id).join()
+        vue.definirDose(Moment.SOIR, 3.0)
+        vue.modifierDateEffet(LocalDate.of(2026, 1, 3))
+        vue.enregistrer().join()
+
+        assertNull(vue.etat.value.erreur, "une correction retroactive doit rester possible")
+        val versions = ordonnances.versionsDe(id).sortedBy { it.ordonnance.dateDebut }
+        assertEquals(
+            LocalDate.of(2026, 1, 3),
+            versions.last().ordonnance.dateDebut,
+            "la nouvelle version doit demarrer a la date d effet corrigee",
+        )
+    }
+
+    @Test
+    fun `enregistrer un medicament archive ne le desarchive pas`() = runTest {
+        remplirFormulaireValide()
+        vue.enregistrer().join()
+        val id = medicaments.tous().single().id
+        archive(id)
+
+        creerVue()
+        vue.charger(id).join()
+        vue.modifierNom("Levothyrox 100")
+        vue.enregistrer().join()
+
+        assertNull(vue.etat.value.erreur)
+        assertEquals("Levothyrox 100", medicaments.parId(id)!!.nom)
+        assertNotNull(
+            medicaments.parId(id)!!.archiveLe,
+            "l enregistrement remplace toute la ligne : il doit reporter la date d archivage",
         )
     }
 }

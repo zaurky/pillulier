@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.DayOfWeek
+import java.time.Instant
 import java.time.LocalDate
 import javax.inject.Inject
 
@@ -31,6 +32,8 @@ data class EtatEdition(
     val unitesParBoite: String = "30",
     val stockUnites: String = "0",
     val critique: Boolean = false,
+    /** Reporté tel quel à l'enregistrement : `@Update` réécrit la ligne entière. */
+    val archiveLe: Instant? = null,
     val type: TypeOrdonnance = TypeOrdonnance.PLANIFIEE,
     val rythme: Rythme = Rythme.TousLesJours,
     /** Texte brut du champ « un jour sur N » ; `rythme` ne peut pas porter une saisie en cours. */
@@ -83,6 +86,7 @@ class EditionViewModel @Inject constructor(
             unitesParBoite = medicament.unitesParBoite.toString(),
             stockUnites = medicament.stockUnites.toString(),
             critique = medicament.critique,
+            archiveLe = medicament.archiveLe,
             type = ordonnance?.ordonnance?.type ?: TypeOrdonnance.PLANIFIEE,
             rythme = ordonnance?.ordonnance?.rythme ?: Rythme.TousLesJours,
             intervalleJours = (ordonnance?.ordonnance?.rythme as? Rythme.UnJourSurN)
@@ -180,6 +184,7 @@ class EditionViewModel @Inject constructor(
                     seuilAlerteJours = etat.seuilAlerteJours.toIntOrNull(),
                     seuilAlerteUnites = etat.seuilAlerteUnites.toIntOrNull(),
                     critique = etat.critique,
+                    archiveLe = etat.archiveLe,
                 ),
                 type = etat.type,
                 rythme = etat.rythme,

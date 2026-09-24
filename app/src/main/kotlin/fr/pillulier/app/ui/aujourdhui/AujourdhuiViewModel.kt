@@ -47,13 +47,16 @@ class AujourdhuiViewModel @Inject constructor(
     val etat: StateFlow<EtatAujourdhui> = combine(
         observerJournee(horloge.aujourdhui()),
         observerAlertes(),
-        medicaments.observerTous(),
+        // Les archivés doivent quitter cette liste : leur ordonnance est close,
+        // donc `enVigueur` retombe à jamais sur la dernière version connue —
+        // encore « à la demande » — et le médicament retiré resterait proposé.
+        medicaments.observerActifs(),
         ordonnances.observerToutes(),
-    ) { lignes, alertes, tous, toutesOrdonnances ->
+    ) { lignes, alertes, actifs, toutesOrdonnances ->
         // Les médicaments à la demande n'ont aucune prise planifiée : ils sont
         // proposés à part, pour un enregistrement ponctuel.
         val aujourdhui = horloge.aujourdhui()
-        val idsALaDemande = tous
+        val idsALaDemande = actifs
             .map { it.id }
             .filter { id ->
                 toutesOrdonnances.enVigueur(id, aujourdhui)?.ordonnance?.type ==
@@ -64,7 +67,7 @@ class AujourdhuiViewModel @Inject constructor(
         EtatAujourdhui(
             lignes = lignes,
             alertes = alertes,
-            aLaDemande = tous.filter { it.id in idsALaDemande },
+            aLaDemande = actifs.filter { it.id in idsALaDemande },
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), EtatAujourdhui())
 

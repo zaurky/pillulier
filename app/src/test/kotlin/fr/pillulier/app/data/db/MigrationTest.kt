@@ -67,6 +67,48 @@ class MigrationTest {
         }
     }
 
+    /**
+     * `dose_prescrite` est la seule table que la migration ne recree pas alors
+     * qu elle detruit son parent : `DROP TABLE ordonnance` effacerait ses
+     * lignes en cascade si les cles etrangeres etaient actives. Room ne les
+     * active qu au `onOpen`, donc apres les migrations — ce test epingle cette
+     * dependance implicite, qui ne tient a aucune ligne de notre code.
+     */
+    @Test
+    fun `la migration 1 vers 2 conserve les doses prescrites`() {
+        aide.createDatabase(BASE, 1).use { base ->
+            base.execSQL(
+                "INSERT INTO medicament (id, nom, dosage, forme, unitesParBoite, stockUnites, " +
+                    "seuilAlerteJours, seuilAlerteUnites, critique) " +
+                    "VALUES (1, 'Levothyrox', '75', 'COMPRIME', 30, 30.0, 7, NULL, 0)",
+            )
+            base.execSQL(
+                "INSERT INTO ordonnance (id, medicamentId, type, rythmeType, rythmeJours, " +
+                    "rythmeN, dateDebut, dateFin) " +
+                    "VALUES (7, 1, 'PLANIFIEE', 'TOUS_LES_JOURS', NULL, NULL, 20000, NULL)",
+            )
+            base.execSQL(
+                "INSERT INTO dose_prescrite (id, ordonnanceId, moment, dose) " +
+                    "VALUES (1, 7, 'MATIN', 1.5)",
+            )
+        }
+
+        val migree = aide.runMigrationsAndValidate(BASE, 2, true, MIGRATION_1_2)
+
+        // La jointure verifie les deux moities du risque d un coup : la ligne
+        // doit survivre, et son `ordonnanceId` doit encore designer l ordonnance
+        // recreee — un identifiant reattribue au passage la laisserait pendante.
+        migree.query(
+            "SELECT d.ordonnanceId, d.moment, d.dose FROM dose_prescrite d " +
+                "JOIN ordonnance o ON o.id = d.ordonnanceId WHERE d.id = 1",
+        ).use {
+            assertEquals(true, it.moveToFirst(), "la dose prescrite doit survivre, rattachee a son ordonnance")
+            assertEquals(7L, it.getLong(0))
+            assertEquals("MATIN", it.getString(1))
+            assertEquals(1.5, it.getDouble(2))
+        }
+    }
+
     @Test
     fun `apres migration un medicament porte plusieurs ordonnances`() {
         aide.createDatabase(BASE, 1).use { base ->

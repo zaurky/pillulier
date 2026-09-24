@@ -14,6 +14,7 @@ import fr.pillulier.app.data.db.MedicamentEntity
 import fr.pillulier.app.data.db.PillulierDatabase
 import fr.pillulier.app.data.db.momentsParDefaut
 import fr.pillulier.app.rappels.Notifications
+import fr.pillulier.app.usecase.ArchiverMedicament
 import fr.pillulier.app.usecase.EnregistrerPrise
 import fr.pillulier.app.usecase.HorlogeFigee
 import fr.pillulier.app.usecase.LigneJournee
@@ -27,10 +28,15 @@ import fr.pillulier.domain.CleRappel
 import fr.pillulier.domain.Forme
 import fr.pillulier.domain.Medicament
 import fr.pillulier.domain.Moment
+import fr.pillulier.domain.Ordonnance
+import fr.pillulier.domain.Rythme
 import fr.pillulier.domain.StatutPrise
+import fr.pillulier.domain.TypeOrdonnance
 import fr.pillulier.domain.codeRequete
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -56,6 +62,9 @@ class AujourdhuiViewModelTest {
     private lateinit var base: PillulierDatabase
     private lateinit var notifications: Notifications
     private lateinit var gestionnaire: NotificationManager
+    private lateinit var medicaments: DepotMedicaments
+    private lateinit var ordonnances: DepotOrdonnances
+    private lateinit var archiver: ArchiverMedicament
     private lateinit var vue: AujourdhuiViewModel
 
     private val horloge = HorlogeFigee(LocalDateTime.of(2026, 1, 5, 8, 0))
@@ -71,32 +80,51 @@ class AujourdhuiViewModelTest {
             .allowMainThreadQueries()
             .build()
 
-        val medicaments = DepotMedicaments(base.medicaments())
-        val ordonnances = DepotOrdonnances(base.ordonnances(), base)
-        val moments = DepotMoments(base.moments())
-        val evenements = DepotEvenements(base.evenements())
-        val preferences = DepotPreferences(contexte)
+        medicaments = DepotMedicaments(base.medicaments())
+        ordonnances = DepotOrdonnances(base.ordonnances(), base)
 
         notifications = Notifications(contexte)
         notifications.creerCanaux()
         gestionnaire = contexte.getSystemService(NotificationManager::class.java)
 
+        archiver = ArchiverMedicament(
+            medicaments = medicaments,
+            ordonnances = ordonnances,
+            programmateur = ProgrammateurEspion(),
+            notifications = notifications,
+            reArmerRappels = reArmerRappels(),
+            horloge = horloge,
+            rafraichirWidget = RafraichirWidget(contexte),
+        )
+
+        creerVue()
+    }
+
+    private fun reArmerRappels() = ReArmerRappels(
+        ordonnances = ordonnances,
+        medicaments = medicaments,
+        moments = DepotMoments(base.moments()),
+        evenements = DepotEvenements(base.evenements()),
+        programmateur = ProgrammateurEspion(),
+        horloge = horloge,
+    )
+
+    /**
+     * L ecran se construit sur la date du jour : rouvrir la vue est le seul
+     * moyen de rejouer l ecran d un autre jour apres avoir avance l horloge.
+     */
+    private fun creerVue() {
+        val moments = DepotMoments(base.moments())
+        val evenements = DepotEvenements(base.evenements())
         vue = AujourdhuiViewModel(
             observerJournee = ObserverJournee(medicaments, ordonnances, moments, evenements, horloge),
             observerAlertes = ObserverAlertes(
-                ObserverStock(medicaments, ordonnances, preferences, horloge),
+                ObserverStock(medicaments, ordonnances, DepotPreferences(contexte), horloge),
             ),
             medicaments = medicaments,
             ordonnances = ordonnances,
             enregistrerPrise = EnregistrerPrise(base, base.evenements(), base.medicaments(), horloge),
-            reArmerRappels = ReArmerRappels(
-                ordonnances = ordonnances,
-                medicaments = medicaments,
-                moments = moments,
-                evenements = evenements,
-                programmateur = ProgrammateurEspion(),
-                horloge = horloge,
-            ),
+            reArmerRappels = reArmerRappels(),
             notifications = notifications,
             horloge = horloge,
             rafraichirWidget = RafraichirWidget(contexte),
@@ -172,5 +200,71 @@ class AujourdhuiViewModelTest {
         vue.cocher(ligneInsuline()).join()
 
         assertEquals(1, base.evenements().duJour(LocalDate.of(2026, 1, 5)).size)
+    }
+
+    private suspend fun insererALaDemande(nom: String): Long {
+        val id = medicaments.enregistrer(
+            Medicament(
+                id = 0,
+                nom = nom,
+                dosage = "500 mg",
+                forme = Forme.COMPRIME,
+                unitesParBoite = 16,
+                stockUnites = 16.0,
+                seuilAlerteJours = null,
+                seuilAlerteUnites = 4,
+                critique = false,
+            ),
+        )
+        ordonnances.enregistrerVersion(
+            medicamentId = id,
+            ordonnance = Ordonnance(
+                id = 0,
+                medicamentId = id,
+                type = TypeOrdonnance.A_LA_DEMANDE,
+                rythme = Rythme.TousLesJours,
+                dateDebut = LocalDate.of(2026, 1, 1),
+                dateFin = null,
+                dateAncrage = LocalDate.of(2026, 1, 1),
+            ),
+            doses = emptyList(),
+            dateEffet = LocalDate.of(2026, 1, 1),
+        )
+        return id
+    }
+
+    @Test
+    fun `un medicament a la demande en cours est propose sur l ecran du jour`() = runTest {
+        insererALaDemande("Doliprane")
+        creerVue()
+
+        assertEquals(
+            listOf("Doliprane"),
+            vue.etat.drop(1).first().aLaDemande.map { it.nom },
+            "un traitement a la demande en cours doit etre propose",
+        )
+    }
+
+    @Test
+    fun `un medicament a la demande archive quitte l ecran du jour`() = runTest {
+        val doliprane = insererALaDemande("Doliprane")
+        // Un second traitement, lui bien vivant : sans lui l etat attendu
+        // serait l etat initial du `StateFlow`, qui ne rejoue jamais, et le
+        // test ne saurait pas distinguer « filtre » de « rien recu ».
+        insererALaDemande("Spasfon")
+
+        archiver(doliprane)
+        // L archivage clot l ordonnance ce soir : c est le lendemain que
+        // `enVigueur` perd la version couvrante et retombe sur la derniere
+        // version connue, encore A_LA_DEMANDE. Sans filtre sur les actifs, le
+        // medicament retire resterait propose indefiniment.
+        horloge.avancerA(LocalDateTime.of(2026, 1, 6, 8, 0))
+        creerVue()
+
+        assertEquals(
+            listOf("Spasfon"),
+            vue.etat.drop(1).first().aLaDemande.map { it.nom },
+            "un medicament archive ne doit plus etre propose a la demande",
+        )
     }
 }
