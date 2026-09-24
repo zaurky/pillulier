@@ -213,11 +213,18 @@ fun EditionEcran(
                 }
             }
 
-            SelecteurDate(
-                libelle = "Début du traitement",
-                date = etat.dateDebut,
-                surChangement = vue::modifierDateDebut,
-            )
+            // Reserve a la creation : c'est la qu'elle fixe le debut du traitement
+            // et l'ancrage du rythme. Sur une modification, enregistrerVersion
+            // ecrase dateDebut par la date d'effet — le champ acceptait donc une
+            // saisie qu'il jetait en silence. « S'applique a partir du » est le
+            // seul controle de date qui agit alors.
+            if (etat.id == 0L) {
+                SelecteurDate(
+                    libelle = "Début du traitement",
+                    date = etat.dateDebut,
+                    surChangement = vue::modifierDateDebut,
+                )
+            }
             SelecteurDateOptionnelle(
                 libelle = "Fin du traitement",
                 date = etat.dateFin,
