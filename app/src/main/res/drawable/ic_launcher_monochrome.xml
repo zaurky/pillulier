@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Couche des icones thematiques Android 13+ : le systeme teinte cette silhouette.
+         La separation des deux moities devient un creux, seul rappel possible du bicolore. -->
+    <group
+        android:pivotX="54"
+        android:pivotY="54"
+        android:rotation="-45">
+
+        <path
+            android:fillColor="#000000"
+            android:pathData="M52.5,41 L34,41 A13,13 0 0 0 34,67 L52.5,67 Z" />
+
+        <path
+            android:fillColor="#000000"
+            android:pathData="M55.5,41 L74,41 A13,13 0 0 1 74,67 L55.5,67 Z" />
+    </group>
+</vector>

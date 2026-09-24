@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- La gelule est dessinee couchee a l'horizontale, puis basculee de 45 degres
+         pour aller du bas-gauche vers le haut-droite. Longueur 66, diametre 26 :
+         33 de rayon depuis le centre, donc dans la zone sure de 36 qu'Android peut rogner. -->
+    <group
+        android:pivotX="54"
+        android:pivotY="54"
+        android:rotation="-45">
+
+        <!-- Moitie rouge, cote bas-gauche une fois la rotation appliquee -->
+        <path
+            android:fillColor="#D93025"
+            android:pathData="M54,41 L34,41 A13,13 0 0 0 34,67 L54,67 Z" />
+
+        <!-- Moitie blanche, cote haut-droite. Le lisere l'empeche de se dissoudre
+             si le lanceur pose l'icone sur un fond clair. -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:strokeColor="#B9C4CC"
+            android:strokeWidth="1.5"
+            android:pathData="M54,41 L74,41 A13,13 0 0 1 74,67 L54,67 Z" />
+    </group>
+</vector>
