@@ -131,6 +131,9 @@ class HistoriqueImmuableTest {
     fun `le nouveau rythme s applique a partir de la date d effet`() = runTest {
         val id = medicamentQuotidienDepuisLePremierJanvier()
 
+        // Ecart de 15 jours (impair) entre l ancrage herite (1er janvier) et la
+        // date d effet (16 janvier) : les deux ancrages candidats desaccordent
+        // sur chaque jour, si bien qu un mauvais ancrage fait echouer le test.
         enregistrerMedicament(
             medicament = medicaments.parId(id)!!,
             type = TypeOrdonnance.PLANIFIEE,
@@ -138,7 +141,7 @@ class HistoriqueImmuableTest {
             dateDebut = LocalDate.of(2026, 1, 1),
             dateFin = null,
             doses = listOf(DosePrescrite(Moment.MATIN, 1.0)),
-            dateEffet = LocalDate.of(2026, 1, 15),
+            dateEffet = LocalDate.of(2026, 1, 16),
         )
 
         suspend fun compte(jour: Int) = prisesAttendues(
@@ -147,9 +150,51 @@ class HistoriqueImmuableTest {
             moments.heures(),
         ).count { it.medicamentId == id }
 
-        // Ancrage au 1er janvier : les jours impairs restent actifs.
-        assertEquals(1, compte(15))
+        // Ancrage reste au 1er janvier (herite) : 16 janvier est a un ecart
+        // impair, donc inactif ; 17 a un ecart pair, donc actif.
+        assertEquals(1, compte(15), "la veille appartient encore a l ancienne version, quotidienne")
         assertEquals(0, compte(16))
         assertEquals(1, compte(17))
+        assertEquals(0, compte(18))
+    }
+
+    @Test
+    fun `une correction retroactive plus ancienne que l ancrage devient le nouvel ancrage`() = runTest {
+        // Le medicament demarre le 10 janvier : son ancrage herite est le 10.
+        val id = enregistrerMedicament(
+            medicament = Medicament(
+                id = 0,
+                nom = "Levothyrox",
+                dosage = "75 µg",
+                forme = Forme.COMPRIME,
+                unitesParBoite = 30,
+                stockUnites = 30.0,
+                seuilAlerteJours = 7,
+                seuilAlerteUnites = null,
+                critique = false,
+            ),
+            type = TypeOrdonnance.PLANIFIEE,
+            rythme = Rythme.TousLesJours,
+            dateDebut = LocalDate.of(2026, 1, 10),
+            dateFin = null,
+            doses = listOf(DosePrescrite(Moment.MATIN, 1.0)),
+            dateEffet = LocalDate.of(2026, 1, 10),
+        )
+
+        // Correction retroactive : la date d effet (5 janvier) precede l ancrage
+        // herite (10 janvier). `coerceAtMost` doit reculer l ancrage jusqu a la
+        // date d effet elle-meme, pas le laisser au 10.
+        enregistrerMedicament(
+            medicament = medicaments.parId(id)!!,
+            type = TypeOrdonnance.PLANIFIEE,
+            rythme = Rythme.UnJourSurN(2),
+            dateDebut = LocalDate.of(2026, 1, 5),
+            dateFin = null,
+            doses = listOf(DosePrescrite(Moment.MATIN, 1.0)),
+            dateEffet = LocalDate.of(2026, 1, 5),
+        )
+
+        val version = ordonnances.versionsDe(id).single()
+        assertEquals(LocalDate.of(2026, 1, 5), version.ordonnance.dateAncrage)
     }
 }

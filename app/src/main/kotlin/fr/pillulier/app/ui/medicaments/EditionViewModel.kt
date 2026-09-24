@@ -178,10 +178,12 @@ class EditionViewModel @Inject constructor(
                 dateDebut = etat.dateDebut,
                 dateFin = etat.dateFin,
                 doses = etat.doses.map { (moment, dose) -> DosePrescrite(moment, dose) },
-                // Pas encore de selecteur de date d'effet (Task 5) : la modification
-                // s'applique des aujourd'hui, ou a partir du debut si le traitement
-                // n'a pas encore commence.
-                dateEffet = maxOf(horloge.aujourdhui(), etat.dateDebut),
+                // Pas encore de selecteur de date d'effet (Task 5). Une creation
+                // n'a pas de passe a proteger : elle prend effet a la date de
+                // debut saisie, meme passee, sous peine de perdre l'ancrage du
+                // rythme. Une modification, elle, s'applique des aujourd'hui, ou
+                // a partir du debut si le traitement n'a pas encore commence.
+                dateEffet = if (etat.id == 0L) etat.dateDebut else maxOf(horloge.aujourdhui(), etat.dateDebut),
             )
             _etat.update { it.copy(erreur = null, enregistre = true) }
         } catch (erreur: IllegalArgumentException) {

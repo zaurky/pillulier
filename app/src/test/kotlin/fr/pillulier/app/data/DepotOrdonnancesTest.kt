@@ -106,6 +106,46 @@ class DepotOrdonnancesTest {
     }
 
     @Test
+    fun `une prescription identique a la version en vigueur supprime quand meme les versions plus tardives`() = runTest {
+        val medicamentId = medicaments.enregistrer(medicament())
+        val quotidien = Ordonnance(
+            id = 0,
+            medicamentId = medicamentId,
+            type = TypeOrdonnance.PLANIFIEE,
+            rythme = Rythme.TousLesJours,
+            dateDebut = LocalDate.of(2026, 1, 1),
+            dateFin = null,
+            dateAncrage = LocalDate.of(2026, 1, 1),
+        )
+        val doses = listOf(DosePrescrite(Moment.MATIN, 1.0))
+
+        // Version en vigueur au 1er janvier, puis une seconde version qui prend
+        // le relai le 10 : deux versions distinctes, dans l ordre.
+        ordonnances.enregistrerVersion(medicamentId, quotidien, doses, LocalDate.of(2026, 1, 1))
+        ordonnances.enregistrerVersion(
+            medicamentId,
+            quotidien.copy(rythme = Rythme.UnJourSurN(2)),
+            doses,
+            LocalDate.of(2026, 1, 10),
+        )
+        assertEquals(2, ordonnances.versionsDe(medicamentId).size)
+
+        // La version du 1er janvier a ete cloturee la veille de celle du 10 :
+        // reecrire exactement ce qu elle prescrit desormais (dateFin comprise)
+        // est donc "la meme chose" pour la version en vigueur au 1er janvier.
+        val memeChoseQuAujourdhuiEnVigueur = quotidien.copy(dateFin = LocalDate.of(2026, 1, 9))
+
+        // Le court-circuit "rien a ecrire" ne doit pas empecher la suppression
+        // de la version du 10, qui commence pourtant a ou apres cette date
+        // d effet.
+        ordonnances.enregistrerVersion(medicamentId, memeChoseQuAujourdhuiEnVigueur, doses, LocalDate.of(2026, 1, 1))
+
+        val versions = ordonnances.versionsDe(medicamentId)
+        assertEquals(1, versions.size, "la version du 10 janvier doit avoir disparu")
+        assertEquals(Rythme.TousLesJours, versions.single().ordonnance.rythme)
+    }
+
+    @Test
     fun `les heures des moments sont modifiables`() = runTest {
         moments.definir(Moment.MATIN, LocalTime.of(7, 30))
 

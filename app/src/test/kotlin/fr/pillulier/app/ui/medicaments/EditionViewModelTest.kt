@@ -30,6 +30,7 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
+import java.time.LocalDate
 import java.time.LocalDateTime
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -191,5 +192,21 @@ class EditionViewModelTest {
 
         assertEquals("4", vue.etat.value.intervalleJours)
         assertEquals(Rythme.UnJourSurN(4), vue.etat.value.rythme)
+    }
+
+    @Test
+    fun `creer un medicament avec une date de debut passee ancre le rythme a cette date`() = runTest {
+        remplirFormulaireValide()
+        vue.modifierDateDebut(LocalDate.of(2026, 1, 1))
+
+        vue.enregistrer().join()
+
+        assertNull(vue.etat.value.erreur)
+        val id = medicaments.tous().single().id
+        assertEquals(
+            LocalDate.of(2026, 1, 1),
+            ordonnances.versionsDe(id).single().ordonnance.dateAncrage,
+            "une creation n a pas de passe a proteger : elle doit ancrer le rythme a la date saisie, pas a aujourd hui",
+        )
     }
 }
