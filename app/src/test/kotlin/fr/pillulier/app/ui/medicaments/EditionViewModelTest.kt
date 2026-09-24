@@ -233,12 +233,20 @@ class EditionViewModelTest {
 
     @Test
     fun `charger remet la date d effet sur aujourd hui`() = runTest {
+        // La date de debut enregistree doit diverger d aujourd hui : sinon un
+        // charger() qui relirait dateDebut au lieu de reinitialiser passerait
+        // le test par coincidence.
         remplirFormulaireValide()
+        vue.modifierDateDebut(LocalDate.of(2026, 1, 1))
         vue.enregistrer().join()
         val id = medicaments.tous().single().id
 
         vue.charger(id).join()
 
-        assertEquals(horloge.aujourdhui(), vue.etat.value.dateEffet)
+        assertEquals(
+            horloge.aujourdhui(),
+            vue.etat.value.dateEffet,
+            "la date d effet doit repartir d aujourd hui, pas de la date de debut relue en base",
+        )
     }
 }
