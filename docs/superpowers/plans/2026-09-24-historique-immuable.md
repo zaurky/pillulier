@@ -432,6 +432,7 @@ Sans cette tâche, créer une seconde version casserait `ObserverStock` et `Aujo
 - Modify: `app/src/main/kotlin/fr/pillulier/app/usecase/ObserverStock.kt:42-45`
 - Modify: `app/src/main/kotlin/fr/pillulier/app/ui/aujourdhui/AujourdhuiViewModel.kt:53-57`
 - Modify: `app/src/main/kotlin/fr/pillulier/app/ui/medicaments/EditionViewModel.kt:70`
+- Modify: `app/src/test/kotlin/fr/pillulier/app/usecase/EnregistrerMedicamentTest.kt:214` — `ordonnances.pourMedicament(id)` disparait ; utiliser `ordonnances.versionsDe(id).isEmpty()`
 - Create: `domain/src/main/kotlin/fr/pillulier/domain/Versions.kt`
 - Test: `domain/src/test/kotlin/fr/pillulier/domain/VersionsTest.kt` (créé)
 - Test: `app/src/test/kotlin/fr/pillulier/app/usecase/ObserverStockTest.kt`
@@ -587,9 +588,14 @@ Dans `app/src/test/kotlin/fr/pillulier/app/usecase/ObserverStockTest.kt`, ajoute
         )
 
         // Insertion directe : enregistrerVersion n'existe qu'a la tache 3.
+        //
+        // La COURANTE est inseree en premier, a dessein. `associateBy` retient la
+        // derniere occurrence d'une cle et `SELECT * FROM ordonnance` rend les
+        // lignes par rowid : dans l'autre ordre, le code fautif retiendrait la
+        // bonne version par accident et le test passerait avant le correctif.
         listOf(
-            version(LocalDate.of(2026, 1, 1), LocalDate.of(2026, 1, 4), doseAncienne),
             version(LocalDate.of(2026, 1, 5), null, doseCourante),
+            version(LocalDate.of(2026, 1, 1), LocalDate.of(2026, 1, 4), doseAncienne),
         ).forEach { v ->
             val ordonnanceId = base.ordonnances().insererOrdonnance(v.ordonnance.versEntite())
             base.ordonnances().insererDoses(v.doses.map { it.versEntite(ordonnanceId) })
@@ -837,7 +843,6 @@ Dans `DepotOrdonnances.kt`, remplacer `enregistrer` par :
      * Rien n'est ecrit si la version en vigueur prescrit deja exactement la
      * meme chose : renommer un medicament ne doit pas couper son historique.
      */
-    @Transaction
     suspend fun enregistrerVersion(
         medicamentId: Long,
         ordonnance: Ordonnance,
@@ -851,18 +856,24 @@ Dans `DepotOrdonnances.kt`, remplacer `enregistrer` par :
 
         val ancrage = courante?.ordonnance?.dateAncrage?.coerceAtMost(dateEffet) ?: dateEffet
 
-        dao.supprimerVersionsDepuis(medicamentId, dateEffet)
-        dao.cloturerVersionsAvant(medicamentId, dateEffet, dateEffet.minusDays(1))
+        // Quatre ecritures qui doivent tenir ou tomber ensemble : un plantage
+        // entre la cloture et l insertion laisserait le medicament sans
+        // prescription. `@Transaction` de Room ne s applique qu aux methodes de
+        // DAO — hors DAO il ne fait rien — d ou `withTransaction`.
+        base.withTransaction {
+            dao.supprimerVersionsDepuis(medicamentId, dateEffet)
+            dao.cloturerVersionsAvant(medicamentId, dateEffet, dateEffet.minusDays(1))
 
-        val id = dao.insererOrdonnance(
-            ordonnance.copy(
-                id = 0,
-                medicamentId = medicamentId,
-                dateDebut = dateEffet,
-                dateAncrage = ancrage,
-            ).versEntite(),
-        )
-        dao.insererDoses(doses.map { it.versEntite(id) })
+            val id = dao.insererOrdonnance(
+                ordonnance.copy(
+                    id = 0,
+                    medicamentId = medicamentId,
+                    dateDebut = dateEffet,
+                    dateAncrage = ancrage,
+                ).versEntite(),
+            )
+            dao.insererDoses(doses.map { it.versEntite(id) })
+        }
     }
 
     private fun prescritLaMemeChose(
@@ -876,7 +887,22 @@ Dans `DepotOrdonnances.kt`, remplacer `enregistrer` par :
             courante.doses.sortedBy { it.moment } == doses.sortedBy { it.moment }
 ```
 
-Ajouter `import androidx.room.Transaction` et les imports `LocalDate`, `enVigueur`.
+`DepotOrdonnances` recoit la base pour pouvoir ouvrir la transaction — son constructeur devient :
+
+```kotlin
+class DepotOrdonnances @Inject constructor(
+    private val dao: OrdonnanceDao,
+    private val base: PillulierDatabase,
+) {
+```
+
+Ajouter `import androidx.room.withTransaction` (le paquet `room-ktx`, deja dependance), `import fr.pillulier.app.data.db.PillulierDatabase`, `java.time.LocalDate` et `fr.pillulier.domain.enVigueur`.
+
+Tous les tests qui construisent `DepotOrdonnances(base.ordonnances())` doivent passer `DepotOrdonnances(base.ordonnances(), base)`. Les trouver avec :
+
+```bash
+grep -rn "DepotOrdonnances(" app/src/test app/src/main
+```
 
 - [ ] **Step 4: Brancher `EnregistrerMedicament`**
 
@@ -1225,7 +1251,11 @@ Ne **pas** toucher `ObserverJournee` ni `ObserverSemaine` : ils lisent `observer
 
 - [ ] **Step 6: Réparer les appelants de `SupprimerMedicament`**
 
-`EditionViewModel.kt` injecte `SupprimerMedicament` et expose `supprimer()`. Renommer en `ArchiverMedicament` / `archiver()`. Mettre à jour `EditionViewModelTest.kt` en conséquence.
+`EditionViewModel.kt` injecte `SupprimerMedicament` et expose `supprimer()`. Renommer en `ArchiverMedicament` / `archiver()`. Mettre à jour `EditionViewModelTest.kt:78` en conséquence.
+
+`EnregistrerMedicamentTest.kt` porte deux tests qui n'ont plus d'objet — `supprimer un medicament supprime son ordonnance` (l. 201) et `supprimer annule les alarmes du medicament avant de l effacer` (l. 218). Les remplacer par leurs equivalents d'archivage, ou les retirer si `ArchiverMedicamentTest` les couvre deja. Le champ `private lateinit var supprimer: SupprimerMedicament` (l. 42) et son montage (l. 65) disparaissent avec eux.
+
+Mettre a jour le commentaire de `RafraichirWidget.kt:19`, qui cite `SupprimerMedicament` parmi les declencheurs de rafraichissement.
 
 - [ ] **Step 7: Lancer la suite complète**
 
