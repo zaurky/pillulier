@@ -120,7 +120,7 @@ class PillulierDatabaseTest {
             ),
         )
 
-        val relu = base.ordonnances().pourMedicament(medicamentId)!!
+        val relu = base.ordonnances().versionsDe(medicamentId).single()
 
         assertEquals(LocalDate.of(2026, 1, 1), relu.ordonnance.dateDebut)
         assertEquals(setOf(Moment.MATIN, Moment.SOIR), relu.doses.map { it.moment }.toSet())
@@ -148,7 +148,7 @@ class PillulierDatabaseTest {
 
         base.medicaments().supprimer(medicamentId)
 
-        assertNull(base.ordonnances().pourMedicament(medicamentId))
+        assertTrue(base.ordonnances().versionsDe(medicamentId).isEmpty())
         assertEquals(0, base.ordonnances().comptePourOrdonnance(ordonnanceId))
     }
 

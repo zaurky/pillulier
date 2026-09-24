@@ -19,8 +19,8 @@ interface OrdonnanceDao {
     suspend fun toutes(): List<OrdonnanceAvecDosesEntity>
 
     @Transaction
-    @Query("SELECT * FROM ordonnance WHERE medicamentId = :medicamentId")
-    suspend fun pourMedicament(medicamentId: Long): OrdonnanceAvecDosesEntity?
+    @Query("SELECT * FROM ordonnance WHERE medicamentId = :medicamentId ORDER BY dateDebut")
+    suspend fun versionsDe(medicamentId: Long): List<OrdonnanceAvecDosesEntity>
 
     @Insert
     suspend fun insererOrdonnance(ordonnance: OrdonnanceEntity): Long

@@ -47,7 +47,7 @@ class RecepteurRappel : BroadcastReceiver() {
                 if (cle.date != horloge.aujourdhui()) return@launch
 
                 val medicament = medicaments.parId(cle.medicamentId) ?: return@launch
-                val dose = ordonnances.pourMedicament(cle.medicamentId)
+                val dose = ordonnances.enVigueur(cle.medicamentId, cle.date)
                     ?.doses
                     ?.firstOrNull { it.moment == cle.moment }
                     ?.dose

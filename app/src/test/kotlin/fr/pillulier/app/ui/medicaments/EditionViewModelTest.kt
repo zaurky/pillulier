@@ -163,7 +163,7 @@ class EditionViewModelTest {
 
         assertNull(vue.etat.value.erreur)
         val id = medicaments.tous().single().id
-        assertEquals(Rythme.UnJourSurN(3), ordonnances.pourMedicament(id)?.ordonnance?.rythme)
+        assertEquals(Rythme.UnJourSurN(3), ordonnances.versionsDe(id).single().ordonnance.rythme)
     }
 
     @Test

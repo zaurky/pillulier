@@ -69,7 +69,7 @@ class EditionViewModel @Inject constructor(
         dejaCharge = true
 
         val medicament = medicaments.parId(medicamentId) ?: return@launch
-        val ordonnance = ordonnances.pourMedicament(medicamentId)
+        val ordonnance = ordonnances.enVigueur(medicamentId, horloge.aujourdhui())
 
         _etat.value = EtatEdition(
             id = medicament.id,

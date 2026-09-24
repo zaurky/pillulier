@@ -17,6 +17,7 @@ import fr.pillulier.app.widget.RafraichirWidget
 import fr.pillulier.domain.CleRappel
 import fr.pillulier.domain.Medicament
 import fr.pillulier.domain.TypeOrdonnance
+import fr.pillulier.domain.enVigueur
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -51,9 +52,13 @@ class AujourdhuiViewModel @Inject constructor(
     ) { lignes, alertes, tous, toutesOrdonnances ->
         // Les médicaments à la demande n'ont aucune prise planifiée : ils sont
         // proposés à part, pour un enregistrement ponctuel.
-        val idsALaDemande = toutesOrdonnances
-            .filter { it.ordonnance.type == TypeOrdonnance.A_LA_DEMANDE }
-            .map { it.ordonnance.medicamentId }
+        val aujourdhui = horloge.aujourdhui()
+        val idsALaDemande = tous
+            .map { it.id }
+            .filter { id ->
+                toutesOrdonnances.enVigueur(id, aujourdhui)?.ordonnance?.type ==
+                    TypeOrdonnance.A_LA_DEMANDE
+            }
             .toSet()
 
         EtatAujourdhui(

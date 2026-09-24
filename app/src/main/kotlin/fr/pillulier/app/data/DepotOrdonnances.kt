@@ -4,8 +4,10 @@ import fr.pillulier.app.data.db.OrdonnanceDao
 import fr.pillulier.domain.DosePrescrite
 import fr.pillulier.domain.Ordonnance
 import fr.pillulier.domain.OrdonnanceAvecDoses
+import fr.pillulier.domain.enVigueur
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import java.time.LocalDate
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -17,8 +19,12 @@ class DepotOrdonnances @Inject constructor(private val dao: OrdonnanceDao) {
 
     suspend fun toutes(): List<OrdonnanceAvecDoses> = dao.toutes().map { it.versDomaine() }
 
-    suspend fun pourMedicament(medicamentId: Long): OrdonnanceAvecDoses? =
-        dao.pourMedicament(medicamentId)?.versDomaine()
+    /** La version active a cette date, ou la plus proche — voir `enVigueur`. */
+    suspend fun enVigueur(medicamentId: Long, date: LocalDate): OrdonnanceAvecDoses? =
+        dao.versionsDe(medicamentId).map { it.versDomaine() }.enVigueur(medicamentId, date)
+
+    suspend fun versionsDe(medicamentId: Long): List<OrdonnanceAvecDoses> =
+        dao.versionsDe(medicamentId).map { it.versDomaine() }
 
     /**
      * Écrit l'ordonnance du médicament et remplace ses doses. Un médicament n'a
@@ -29,7 +35,7 @@ class DepotOrdonnances @Inject constructor(private val dao: OrdonnanceDao) {
         ordonnance: Ordonnance,
         doses: List<DosePrescrite>,
     ) {
-        val existante = dao.pourMedicament(medicamentId)
+        val existante = dao.versionsDe(medicamentId).firstOrNull()
         val id = if (existante == null) {
             dao.insererOrdonnance(ordonnance.copy(id = 0, medicamentId = medicamentId).versEntite())
         } else {

@@ -8,6 +8,7 @@ import fr.pillulier.app.ui.libelleDoseComplete
 import fr.pillulier.domain.JoursFeriesFrance
 import fr.pillulier.domain.TypeOrdonnance
 import fr.pillulier.domain.dateAlerte
+import fr.pillulier.domain.enVigueur
 import fr.pillulier.domain.projectionStock
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
@@ -39,11 +40,10 @@ class ObserverStock @Inject constructor(
         ordonnances.observerToutes(),
         preferences.preferences,
     ) { tousMedicaments, toutesOrdonnances, prefs ->
-        val parMedicament = toutesOrdonnances.associateBy { it.ordonnance.medicamentId }
         val aujourdhui = horloge.aujourdhui()
 
         tousMedicaments.map { medicament ->
-            val ordonnance = parMedicament[medicament.id]
+            val ordonnance = toutesOrdonnances.enVigueur(medicament.id, aujourdhui)
             val aLaDemande = ordonnance == null ||
                 ordonnance.ordonnance.type == TypeOrdonnance.A_LA_DEMANDE
 

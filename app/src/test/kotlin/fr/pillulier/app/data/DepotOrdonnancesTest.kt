@@ -75,7 +75,7 @@ class DepotOrdonnancesTest {
             doses = listOf(DosePrescrite(Moment.MATIN, 1.0)),
         )
 
-        val relue = ordonnances.pourMedicament(medicamentId)!!
+        val relue = ordonnances.versionsDe(medicamentId).single()
 
         assertEquals(Rythme.JoursDeSemaine(setOf(java.time.DayOfWeek.MONDAY)), relue.ordonnance.rythme)
         assertEquals(1, relue.doses.size)
@@ -97,7 +97,7 @@ class DepotOrdonnancesTest {
         ordonnances.enregistrer(medicamentId, ordonnance, listOf(DosePrescrite(Moment.MATIN, 1.0)))
         ordonnances.enregistrer(medicamentId, ordonnance, listOf(DosePrescrite(Moment.SOIR, 2.0)))
 
-        val relue = ordonnances.pourMedicament(medicamentId)!!
+        val relue = ordonnances.versionsDe(medicamentId).single()
 
         assertEquals(listOf(Moment.SOIR), relue.doses.map { it.moment })
         assertEquals(2.0, relue.doses.single().dose)

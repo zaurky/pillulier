@@ -99,7 +99,7 @@ class EnregistrerMedicamentTest {
         )
 
         assertEquals("Levothyrox", medicaments.parId(id)!!.nom)
-        assertEquals(1, ordonnances.pourMedicament(id)!!.doses.size)
+        assertEquals(1, ordonnances.versionsDe(id).single().doses.size)
     }
 
     @Test
@@ -169,7 +169,7 @@ class EnregistrerMedicamentTest {
             doses = emptyList(),
         )
 
-        assertTrue(ordonnances.pourMedicament(id)!!.doses.isEmpty())
+        assertTrue(ordonnances.versionsDe(id).single().doses.isEmpty())
     }
 
     @Test
@@ -194,7 +194,7 @@ class EnregistrerMedicamentTest {
 
         assertEquals(1, medicaments.tous().size)
         assertEquals("100 µg", medicaments.parId(id)!!.dosage)
-        assertEquals(listOf(Moment.SOIR), ordonnances.pourMedicament(id)!!.doses.map { it.moment })
+        assertEquals(listOf(Moment.SOIR), ordonnances.versionsDe(id).single().doses.map { it.moment })
     }
 
     @Test
@@ -211,7 +211,7 @@ class EnregistrerMedicamentTest {
         supprimer(id)
 
         assertNull(medicaments.parId(id))
-        assertNull(ordonnances.pourMedicament(id))
+        assertTrue(ordonnances.versionsDe(id).isEmpty())
     }
 
     @Test
