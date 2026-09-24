@@ -24,3 +24,18 @@ fun List<OrdonnanceAvecDoses>.enVigueur(
 
 private fun couvre(ordonnance: Ordonnance, date: LocalDate): Boolean =
     date >= ordonnance.dateDebut && (ordonnance.dateFin?.let { date <= it } ?: true)
+
+/**
+ * Vrai si [ordonnance] et [doses] prescrivent exactement ce que cette version
+ * prescrit deja. Sert a ne pas couper l'historique d'un medicament qu'on se
+ * contente de renommer, et a ne pas alarmer l'utilisateur pour un
+ * enregistrement qui n'ecrira rien.
+ */
+fun OrdonnanceAvecDoses.prescritLaMemeChose(
+    ordonnance: Ordonnance,
+    doses: List<DosePrescrite>,
+): Boolean =
+    this.ordonnance.type == ordonnance.type &&
+        this.ordonnance.rythme == ordonnance.rythme &&
+        this.ordonnance.dateFin == ordonnance.dateFin &&
+        this.doses.sortedBy { it.moment } == doses.sortedBy { it.moment }

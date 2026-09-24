@@ -12,6 +12,9 @@ import fr.pillulier.domain.DosePrescrite
 import fr.pillulier.domain.Forme
 import fr.pillulier.domain.Medicament
 import fr.pillulier.domain.Moment
+import fr.pillulier.domain.Ordonnance
+import fr.pillulier.domain.enVigueur
+import fr.pillulier.domain.prescritLaMemeChose
 import fr.pillulier.domain.Rythme
 import fr.pillulier.domain.TypeOrdonnance
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -46,6 +49,11 @@ data class EtatEdition(
     val seuilAlerteJours: String = "",
     val seuilAlerteUnites: String = "",
     val erreur: String? = null,
+    /**
+     * Non nul = l'enregistrement attend une confirmation, et voici combien de
+     * versions de prescription la date d'effet saisie ferait disparaitre.
+     */
+    val versionsAEffacer: Int? = null,
     val enregistre: Boolean = false,
 )
 
@@ -172,6 +180,57 @@ class EditionViewModel @Inject constructor(
             return@launch
         }
 
+        val dateEffet = if (etat.id == 0L) etat.dateDebut else etat.dateEffet
+
+        // Remonter avant la plus ancienne prescription effacerait toutes les
+        // versions d'un coup — geste legitime, mais indiscernable d'une annee
+        // mal tapee dans le selecteur. On compte ce qui disparaitrait et on
+        // laisse l'ecran demander confirmation.
+        if (etat.id != 0L) {
+            val existantes = ordonnances.versionsDe(etat.id)
+            val plusAncienne = existantes.minByOrNull { it.ordonnance.dateDebut }?.ordonnance?.dateDebut
+            // Une prescription inchangee n'ecrit rien, quelle que soit la date
+            // d'effet : alarmer sur un simple renommage serait une fausse alerte.
+            val changeQuelqueChose = existantes.enVigueur(etat.id, dateEffet)
+                ?.prescritLaMemeChose(ordonnanceSaisie(etat, dateEffet), dosesSaisies(etat)) != true
+
+            if (plusAncienne != null && dateEffet < plusAncienne && changeQuelqueChose) {
+                _etat.update { it.copy(erreur = null, versionsAEffacer = existantes.size) }
+                return@launch
+            }
+        }
+
+        ecrire(etat, dateEffet)
+    }
+
+    /** L'utilisateur a vu combien de versions disparaissent et maintient. */
+    fun confirmerEffacement() = viewModelScope.launch {
+        val etat = _etat.value
+        _etat.update { it.copy(versionsAEffacer = null) }
+        ecrire(etat, if (etat.id == 0L) etat.dateDebut else etat.dateEffet)
+    }
+
+    /** L'utilisateur renonce : rien n'a ete ecrit, l'ecran reste ouvert. */
+    fun renoncerEffacement() = _etat.update { it.copy(versionsAEffacer = null) }
+
+    private fun dosesSaisies(etat: EtatEdition): List<DosePrescrite> =
+        etat.doses.map { (moment, dose) -> DosePrescrite(moment, dose) }
+
+    /** L'ordonnance telle que le formulaire la decrit, pour comparaison. */
+    private fun ordonnanceSaisie(etat: EtatEdition, dateEffet: LocalDate) = Ordonnance(
+        id = 0,
+        medicamentId = etat.id,
+        type = etat.type,
+        rythme = etat.rythme,
+        dateDebut = dateEffet,
+        dateFin = etat.dateFin,
+        dateAncrage = dateEffet,
+    )
+
+    private suspend fun ecrire(etat: EtatEdition, dateEffet: LocalDate) {
+        val unitesParBoite = etat.unitesParBoite.toIntOrNull()
+        val stockUnites = etat.stockUnites.replace(',', '.').toDoubleOrNull()
+
         try {
             enregistrerMedicament(
                 medicament = Medicament(
@@ -196,7 +255,7 @@ class EditionViewModel @Inject constructor(
                 // du rythme (le champ « S'applique a partir du » n'est d'ailleurs
                 // pas affiche a la creation, voir EditionEcran). Une modification
                 // utilise la date d'effet saisie par l'utilisateur.
-                dateEffet = if (etat.id == 0L) etat.dateDebut else etat.dateEffet,
+                dateEffet = dateEffet,
             )
             _etat.update { it.copy(erreur = null, enregistre = true) }
         } catch (erreur: IllegalArgumentException) {

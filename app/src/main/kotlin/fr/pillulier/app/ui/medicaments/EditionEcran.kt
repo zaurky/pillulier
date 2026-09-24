@@ -88,6 +88,35 @@ fun EditionEcran(
         )
     }
 
+    // Dater un effet avant la plus ancienne prescription efface toutes les
+    // versions d'un coup. Le geste est legitime — la spec autorise la
+    // correction retroactive — mais une annee mal tapee dans le selecteur en
+    // est indiscernable, alors on montre ce qui disparaitrait.
+    etat.versionsAEffacer?.let { combien ->
+        AlertDialog(
+            onDismissRequest = vue::renoncerEffacement,
+            title = { Text("Remonter avant le début du traitement ?") },
+            text = {
+                Text(
+                    "Cette date d'effet est antérieure à la plus ancienne ordonnance " +
+                        "enregistrée. " +
+                        if (combien == 1) {
+                            "La prescription actuelle sera remplacée par celle-ci."
+                        } else {
+                            "Les $combien versions de prescription seront remplacées par celle-ci."
+                        } +
+                        " Vos prises déjà enregistrées ne sont pas touchées.",
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { vue.confirmerEffacement() }) { Text("Remplacer") }
+            },
+            dismissButton = {
+                TextButton(onClick = vue::renoncerEffacement) { Text("Annuler") }
+            },
+        )
+    }
+
     Column(
         modifier = Modifier
             .fillMaxWidth()

@@ -341,4 +341,83 @@ class EditionViewModelTest {
             "l enregistrement remplace toute la ligne : il doit reporter la date d archivage",
         )
     }
+
+    /**
+     * Cree un medicament au 10 janvier puis rouvre l ecran, pret a etre modifie.
+     * Sa seule version commence donc au 10, et toute date d effet anterieure
+     * remonte avant la prescription la plus ancienne.
+     */
+    private suspend fun medicamentCommencantLeDix(): Long {
+        remplirFormulaireValide()
+        vue.modifierDateDebut(LocalDate.of(2026, 1, 10))
+        vue.enregistrer().join()
+        val id = medicaments.tous().single().id
+
+        creerVue()
+        vue.charger(id).join()
+        return id
+    }
+
+    @Test
+    fun `une date d effet anterieure a la plus ancienne version demande confirmation`() = runTest {
+        val id = medicamentCommencantLeDix()
+
+        vue.modifierDateEffet(LocalDate.of(2026, 1, 2))
+        vue.definirDose(Moment.SOIR, 2.0)
+        vue.enregistrer().join()
+
+        assertEquals(1, vue.etat.value.versionsAEffacer, "la version du 10 janvier disparaitrait")
+        assertEquals(false, vue.etat.value.enregistre, "rien ne doit etre ecrit avant confirmation")
+        assertEquals(
+            LocalDate.of(2026, 1, 10),
+            ordonnances.versionsDe(id).single().ordonnance.dateDebut,
+            "la version existante doit etre intacte",
+        )
+    }
+
+    @Test
+    fun `confirmer l effacement enregistre la version retroactive`() = runTest {
+        val id = medicamentCommencantLeDix()
+        vue.modifierDateEffet(LocalDate.of(2026, 1, 2))
+        vue.definirDose(Moment.SOIR, 2.0)
+        vue.enregistrer().join()
+
+        vue.confirmerEffacement().join()
+
+        assertEquals(null, vue.etat.value.versionsAEffacer)
+        assertEquals(
+            LocalDate.of(2026, 1, 2),
+            ordonnances.versionsDe(id).single().ordonnance.dateDebut,
+        )
+    }
+
+    @Test
+    fun `renoncer a l effacement laisse la prescription intacte`() = runTest {
+        val id = medicamentCommencantLeDix()
+        vue.modifierDateEffet(LocalDate.of(2026, 1, 2))
+        vue.definirDose(Moment.SOIR, 2.0)
+        vue.enregistrer().join()
+
+        vue.renoncerEffacement()
+
+        assertEquals(null, vue.etat.value.versionsAEffacer)
+        assertEquals(false, vue.etat.value.enregistre)
+        assertEquals(
+            LocalDate.of(2026, 1, 10),
+            ordonnances.versionsDe(id).single().ordonnance.dateDebut,
+        )
+    }
+
+    @Test
+    fun `une date d effet posterieure a la plus ancienne version enregistre sans confirmation`() = runTest {
+        val id = medicamentCommencantLeDix()
+
+        vue.modifierDateEffet(LocalDate.of(2026, 1, 20))
+        vue.definirDose(Moment.SOIR, 2.0)
+        vue.enregistrer().join()
+
+        assertEquals(null, vue.etat.value.versionsAEffacer)
+        assertEquals(true, vue.etat.value.enregistre)
+        assertEquals(2, ordonnances.versionsDe(id).size)
+    }
 }

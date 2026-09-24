@@ -7,6 +7,7 @@ import fr.pillulier.domain.DosePrescrite
 import fr.pillulier.domain.Ordonnance
 import fr.pillulier.domain.OrdonnanceAvecDoses
 import fr.pillulier.domain.enVigueur
+import fr.pillulier.domain.prescritLaMemeChose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import java.time.LocalDate
@@ -53,7 +54,7 @@ class DepotOrdonnances @Inject constructor(
         val existantes = versionsDe(medicamentId)
         val courante = existantes.enVigueur(medicamentId, dateEffet)
 
-        if (courante != null && prescritLaMemeChose(courante, ordonnance, doses)) {
+        if (courante != null && courante.prescritLaMemeChose(ordonnance, doses)) {
             // Un renommage seul ne doit rien ecrire, mais la regle reste « tout
             // a partir de dateEffet » : si une AUTRE version plus tardive
             // existe deja, elle doit disparaitre meme quand la version en
@@ -89,13 +90,4 @@ class DepotOrdonnances @Inject constructor(
         }
     }
 
-    private fun prescritLaMemeChose(
-        courante: OrdonnanceAvecDoses,
-        ordonnance: Ordonnance,
-        doses: List<DosePrescrite>,
-    ): Boolean =
-        courante.ordonnance.type == ordonnance.type &&
-            courante.ordonnance.rythme == ordonnance.rythme &&
-            courante.ordonnance.dateFin == ordonnance.dateFin &&
-            courante.doses.sortedBy { it.moment } == doses.sortedBy { it.moment }
 }
