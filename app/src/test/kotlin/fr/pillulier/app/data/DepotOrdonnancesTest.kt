@@ -146,6 +146,38 @@ class DepotOrdonnancesTest {
     }
 
     @Test
+    fun `une prescription identique reecrite a la date de debut de la version en vigueur ne cree rien`() = runTest {
+        val medicamentId = medicaments.enregistrer(medicament())
+        val quotidien = Ordonnance(
+            id = 0,
+            medicamentId = medicamentId,
+            type = TypeOrdonnance.PLANIFIEE,
+            rythme = Rythme.TousLesJours,
+            dateDebut = LocalDate.of(2026, 1, 1),
+            dateFin = null,
+            dateAncrage = LocalDate.of(2026, 1, 1),
+        )
+        val doses = listOf(DosePrescrite(Moment.MATIN, 1.0))
+
+        // Une seule version, dont la date de debut est exactement la date
+        // d effet du reenregistrement qui suit : `courante` demarre alors "a ou
+        // apres dateEffet" comme n importe quelle version tardive, et ne doit
+        // pas se compter elle-meme.
+        ordonnances.enregistrerVersion(medicamentId, quotidien, doses, LocalDate.of(2026, 1, 1))
+        val idInitial = ordonnances.versionsDe(medicamentId).single().ordonnance.id
+
+        ordonnances.enregistrerVersion(medicamentId, quotidien, doses, LocalDate.of(2026, 1, 1))
+
+        val versions = ordonnances.versionsDe(medicamentId)
+        assertEquals(1, versions.size, "aucune version supplementaire ne doit apparaitre")
+        assertEquals(
+            idInitial,
+            versions.single().ordonnance.id,
+            "la version en vigueur ne doit pas etre recreee quand rien ne change",
+        )
+    }
+
+    @Test
     fun `les heures des moments sont modifiables`() = runTest {
         moments.definir(Moment.MATIN, LocalTime.of(7, 30))
 

@@ -49,11 +49,19 @@ class DepotOrdonnances @Inject constructor(
         val existantes = versionsDe(medicamentId)
         val courante = existantes.enVigueur(medicamentId, dateEffet)
 
-        // Un renommage seul ne doit rien ecrire, mais la regle reste « tout a
-        // partir de dateEffet » : si une version plus tardive existe deja, elle
-        // doit disparaitre meme quand la version en vigueur ne change pas.
-        val rienAEffacer = existantes.none { it.ordonnance.dateDebut >= dateEffet }
-        if (courante != null && rienAEffacer && prescritLaMemeChose(courante, ordonnance, doses)) return
+        if (courante != null && prescritLaMemeChose(courante, ordonnance, doses)) {
+            // Un renommage seul ne doit rien ecrire, mais la regle reste « tout
+            // a partir de dateEffet » : si une AUTRE version plus tardive
+            // existe deja, elle doit disparaitre meme quand la version en
+            // vigueur ne change pas. `courante` elle-meme demarre forcement a
+            // ou avant dateEffet ; l exclure evite de la prendre pour la
+            // version tardive qu il faudrait effacer, quand elle demarre
+            // exactement a dateEffet.
+            val rienAEffacer = existantes.none {
+                it.ordonnance.id != courante.ordonnance.id && it.ordonnance.dateDebut >= dateEffet
+            }
+            if (rienAEffacer) return
+        }
 
         val ancrage = courante?.ordonnance?.dateAncrage?.coerceAtMost(dateEffet) ?: dateEffet
 
