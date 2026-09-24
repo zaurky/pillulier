@@ -128,6 +128,34 @@ class PillulierDatabaseTest {
     }
 
     @Test
+    fun `supprimer les versions depuis une date supprime leurs doses en cascade`() = runTest {
+        // `supprimerVersionsDepuis` est le seul chemin qui efface encore une
+        // ligne `ordonnance` en base : `enregistrerVersion` l appelle a chaque
+        // modification de prescription qui remplace une version plus tardive.
+        val medicamentId = base.medicaments().inserer(medicament())
+        val ordonnanceId = base.ordonnances().insererOrdonnance(
+            OrdonnanceEntity(
+                medicamentId = medicamentId,
+                type = TypeOrdonnance.PLANIFIEE,
+                rythmeType = "TOUS_LES_JOURS",
+                rythmeJours = null,
+                rythmeN = null,
+                dateDebut = LocalDate.of(2026, 1, 10),
+                dateFin = null,
+                dateAncrage = LocalDate.of(2026, 1, 10),
+            ),
+        )
+        base.ordonnances().insererDoses(
+            listOf(DosePrescriteEntity(ordonnanceId = ordonnanceId, moment = Moment.MATIN, dose = 1.0)),
+        )
+
+        base.ordonnances().supprimerVersionsDepuis(medicamentId, LocalDate.of(2026, 1, 10))
+
+        assertTrue(base.ordonnances().versionsDe(medicamentId).isEmpty())
+        assertEquals(0, base.ordonnances().comptePourOrdonnance(ordonnanceId))
+    }
+
+    @Test
     fun `enregistrer deux fois la meme prise planifiee est sans effet`() = runTest {
         val medicamentId = base.medicaments().inserer(medicament())
         val prise = EvenementPriseEntity(

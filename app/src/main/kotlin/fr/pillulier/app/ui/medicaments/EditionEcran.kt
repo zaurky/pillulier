@@ -60,16 +60,17 @@ fun EditionEcran(
     LaunchedEffect(medicamentId) { vue.charger(medicamentId) }
     LaunchedEffect(etat.enregistre) { if (etat.enregistre) surSortie() }
 
-    // La clé étrangère de `evenement_prise` est en cascade : supprimer efface
-    // aussi tout le journal des prises du médicament, sans retour possible.
+    // Un médicament ne se supprime pas : il s'archive. Son historique de
+    // prises reste lisible, seul son planning à venir s'arrête. Task 5
+    // affine ce dialogue (sélecteur de date, wording final).
     if (confirmationSuppression) {
         AlertDialog(
             onDismissRequest = { confirmationSuppression = false },
-            title = { Text("Supprimer ce médicament ?") },
+            title = { Text("Archiver ce médicament ?") },
             text = {
                 Text(
-                    "« ${etat.nom} » et l'historique de toutes ses prises seront " +
-                        "définitivement effacés. Cette action est irréversible.",
+                    "« ${etat.nom} » sera archivé : il disparaîtra de la liste et des " +
+                        "prochains jours. Ses prises déjà enregistrées restent dans l'historique.",
                 )
             },
             confirmButton = {
@@ -79,7 +80,7 @@ fun EditionEcran(
                         vue.archiver()
                     },
                 ) {
-                    Text("Supprimer")
+                    Text("Archiver")
                 }
             },
             dismissButton = {

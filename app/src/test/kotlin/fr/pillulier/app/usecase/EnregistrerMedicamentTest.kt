@@ -243,16 +243,22 @@ class EnregistrerMedicamentTest {
 
         archiver(id)
 
-        // La fenetre a partir de demain, les quatre moments : le rearmement qui
-        // suit reconstruit deja aujourd hui et hier sur son propre surensemble.
+        // Le rearmement qui suit annule lui aussi un surensemble sur
+        // (-1L until JOURS_FENETRE) pour tout medicament connu, l archive
+        // compris : un simple containsAll serait vrai quelles que soient les
+        // bornes de la boucle d archivage, puisque son intervalle (demain et
+        // apres-demain) est deja inclus dans celui du rearmement. On verifie
+        // donc le prefixe exact, dans l ordre d appel, pour isoler ce que la
+        // boucle d archivage annule elle-meme avant de rearmer.
         val attendues = (1L until ReArmerRappels.JOURS_FENETRE).flatMap { decalage ->
             Moment.entries.map { moment ->
                 CleRappel(id, LocalDate.of(2026, 1, 5).plusDays(decalage), moment)
             }
         }
-        assertTrue(
-            programmateur.annulees.containsAll(attendues),
-            "les alarmes a venir du medicament archive doivent etre annulees",
+        assertEquals(
+            attendues,
+            programmateur.annulees.take(attendues.size),
+            "la boucle d archivage doit annuler exactement demain et apres-demain, avant le rearmement",
         )
     }
 
