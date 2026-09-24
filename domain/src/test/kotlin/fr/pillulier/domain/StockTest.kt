@@ -13,8 +13,9 @@ class StockTest {
         rythme: Rythme = Rythme.TousLesJours,
         dateFin: LocalDate? = null,
         doses: List<DosePrescrite> = listOf(DosePrescrite(Moment.MATIN, 1.0)),
+        dateAncrage: LocalDate = debut,
     ) = OrdonnanceAvecDoses(
-        ordonnance = Ordonnance(1, 10, TypeOrdonnance.PLANIFIEE, rythme, debut, dateFin),
+        ordonnance = Ordonnance(1, 10, TypeOrdonnance.PLANIFIEE, rythme, debut, dateFin, dateAncrage),
         doses = doses,
     )
 

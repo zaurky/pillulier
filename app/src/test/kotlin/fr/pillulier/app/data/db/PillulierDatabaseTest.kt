@@ -110,6 +110,7 @@ class PillulierDatabaseTest {
                 rythmeN = null,
                 dateDebut = LocalDate.of(2026, 1, 1),
                 dateFin = null,
+                dateAncrage = LocalDate.of(2026, 1, 1),
             ),
         )
         base.ordonnances().insererDoses(
@@ -138,6 +139,7 @@ class PillulierDatabaseTest {
                 rythmeN = null,
                 dateDebut = LocalDate.of(2026, 1, 1),
                 dateFin = null,
+                dateAncrage = LocalDate.of(2026, 1, 1),
             ),
         )
         base.ordonnances().insererDoses(

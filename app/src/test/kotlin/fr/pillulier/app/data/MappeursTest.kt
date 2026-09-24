@@ -45,6 +45,7 @@ class MappeursTest {
                 rythmeN = 2,
                 dateDebut = LocalDate.of(2026, 1, 1),
                 dateFin = LocalDate.of(2026, 1, 10),
+                dateAncrage = LocalDate.of(2026, 1, 1),
             ),
             doses = listOf(DosePrescriteEntity(1, 4, Moment.MATIN, 1.5)),
         )

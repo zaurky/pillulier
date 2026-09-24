@@ -27,7 +27,8 @@ class PlanningTest {
         rythme: Rythme = Rythme.TousLesJours,
         dateDebut: LocalDate = LocalDate.of(2026, 1, 1),
         dateFin: LocalDate? = null,
-    ) = Ordonnance(id, medicamentId, type, rythme, dateDebut, dateFin)
+        dateAncrage: LocalDate = dateDebut,
+    ) = Ordonnance(id, medicamentId, type, rythme, dateDebut, dateFin, dateAncrage)
 
     @Test
     fun `tous les jours retient chaque date de la fenetre`() {
@@ -70,6 +71,22 @@ class PlanningTest {
         assertTrue(estJourActif(o, LocalDate.of(2026, 1, 5)), "premier jour de la cure")
         assertTrue(estJourActif(o, LocalDate.of(2026, 1, 7)), "dernier jour de la cure")
         assertFalse(estJourActif(o, LocalDate.of(2026, 1, 8)), "lendemain de la fin")
+    }
+
+    @Test
+    fun `un jour sur deux garde sa phase quand l ordonnance est scindee`() {
+        // Prescription du 1er janvier, prises les 1, 3, 5, 7.
+        // Scindee le 4 : la seconde version doit continuer sur les jours impairs.
+        val seconde = ordonnance(
+            rythme = Rythme.UnJourSurN(2),
+            dateDebut = LocalDate.of(2026, 1, 4),
+            dateAncrage = LocalDate.of(2026, 1, 1),
+        )
+
+        assertFalse(estJourActif(seconde, LocalDate.of(2026, 1, 4)))
+        assertTrue(estJourActif(seconde, LocalDate.of(2026, 1, 5)))
+        assertFalse(estJourActif(seconde, LocalDate.of(2026, 1, 6)))
+        assertTrue(estJourActif(seconde, LocalDate.of(2026, 1, 7)))
     }
 
     @Test

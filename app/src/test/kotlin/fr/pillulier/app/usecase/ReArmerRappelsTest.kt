@@ -105,6 +105,7 @@ class ReArmerRappelsTest {
                 rythme = Rythme.TousLesJours,
                 dateDebut = LocalDate.of(2026, 1, 1),
                 dateFin = null,
+                dateAncrage = LocalDate.of(2026, 1, 1),
             ),
             doses = doses,
         )
@@ -200,6 +201,7 @@ class ReArmerRappelsTest {
                 rythme = Rythme.TousLesJours,
                 dateDebut = LocalDate.of(2026, 1, 1),
                 dateFin = null,
+                dateAncrage = LocalDate.of(2026, 1, 1),
             ),
             doses = listOf(DosePrescrite(Moment.MATIN, 1.0)),
         )
@@ -233,6 +235,7 @@ class ReArmerRappelsTest {
                 rythme = Rythme.TousLesJours,
                 dateDebut = LocalDate.of(2026, 1, 1),
                 dateFin = null,
+                dateAncrage = LocalDate.of(2026, 1, 1),
             ),
             doses = emptyList(),
         )

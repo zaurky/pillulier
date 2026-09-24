@@ -17,7 +17,7 @@ fun estJourActif(ordonnance: Ordonnance, date: LocalDate): Boolean {
         Rythme.TousLesJours -> true
         is Rythme.JoursDeSemaine -> date.dayOfWeek in rythme.jours
         is Rythme.UnJourSurN ->
-            (date.toEpochDay() - ordonnance.dateDebut.toEpochDay()) % rythme.n == 0L
+            (date.toEpochDay() - ordonnance.dateAncrage.toEpochDay()) % rythme.n == 0L
     }
 }
 

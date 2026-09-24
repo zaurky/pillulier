@@ -58,6 +58,7 @@ class EnregistrerMedicament @Inject constructor(
                 rythme = rythme,
                 dateDebut = dateDebut,
                 dateFin = dateFin,
+                dateAncrage = dateDebut,
             ),
             doses = if (type == TypeOrdonnance.PLANIFIEE) doses else emptyList(),
         )

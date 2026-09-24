@@ -14,7 +14,7 @@ import fr.pillulier.domain.Moment
         MomentConfigEntity::class,
         EvenementPriseEntity::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = true,
 )
 @TypeConverters(Convertisseurs::class)

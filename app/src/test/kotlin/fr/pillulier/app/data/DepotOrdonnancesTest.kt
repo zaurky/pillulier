@@ -70,6 +70,7 @@ class DepotOrdonnancesTest {
                 rythme = Rythme.JoursDeSemaine(setOf(java.time.DayOfWeek.MONDAY)),
                 dateDebut = LocalDate.of(2026, 1, 1),
                 dateFin = null,
+                dateAncrage = LocalDate.of(2026, 1, 1),
             ),
             doses = listOf(DosePrescrite(Moment.MATIN, 1.0)),
         )
@@ -90,6 +91,7 @@ class DepotOrdonnancesTest {
             rythme = Rythme.TousLesJours,
             dateDebut = LocalDate.of(2026, 1, 1),
             dateFin = null,
+            dateAncrage = LocalDate.of(2026, 1, 1),
         )
 
         ordonnances.enregistrer(medicamentId, ordonnance, listOf(DosePrescrite(Moment.MATIN, 1.0)))

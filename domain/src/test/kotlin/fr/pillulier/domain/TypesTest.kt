@@ -25,6 +25,7 @@ class TypesTest {
                 rythme = Rythme.JoursDeSemaine(setOf(DayOfWeek.MONDAY, DayOfWeek.THURSDAY)),
                 dateDebut = LocalDate.of(2026, 1, 1),
                 dateFin = null,
+                dateAncrage = LocalDate.of(2026, 1, 1),
             ),
             doses = listOf(
                 DosePrescrite(Moment.MATIN, 2.0),
