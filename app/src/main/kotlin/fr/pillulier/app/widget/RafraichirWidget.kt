@@ -17,7 +17,8 @@ import javax.inject.Inject
  * *Plus tard* d'une notification (`RecepteurActionPrise`), un changement
  * d'heure de moment (`PreferencesViewModel`), l'enregistrement ou la
  * suppression d'un médicament (`EnregistrerMedicament`, `SupprimerMedicament`),
- * le passage à un nouveau jour (`TravailQuotidien`) et le rattrapage après
+ * le passage à un nouveau jour (`ClotureQuotidienne`, réveillée par l'alarme
+ * exacte de minuit) et le rattrapage après
  * démarrage ou mise à jour (`RecepteurDemarrage`). `updateAll` est sans effet
  * quand aucun widget n'est posé : l'appeler ne coûte rien dans ce cas.
  */

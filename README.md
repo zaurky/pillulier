@@ -49,6 +49,12 @@ calcule exactement la même chose qu'eux, et ne peut pas afficher autre chose. M
 session Glance est bornée dans le temps — son affichage peut dater d'avant le dernier
 rafraîchissement, le temps qu'un `updateAll` explicite le remette à jour.
 
+Le passage à la journée suivante en est un : une alarme exacte réveille l'application à
+00h05 pour clôturer la veille, réarmer les rappels et redessiner le widget. Elle se
+reprogramme à chaque déclenchement. Un travail WorkManager quotidien reste en filet,
+car il survit là où l'alarme disparaît — à l'arrêt forcé — mais Doze peut le différer de
+plusieurs heures, soit bien après la première prise du matin.
+
 ### Posologies gérées
 
 Quatre moments globaux configurables (Matin, Midi, Soir, Coucher). Un rythme au choix :
