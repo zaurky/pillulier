@@ -149,7 +149,23 @@ renouvellement.
 ## Lecture
 
 Inchangés : `prisesAttendues()`, `ObserverJournee`, `ObserverSemaine`, `ReArmerRappels`,
-le widget.
+le widget. Tous parcourent la liste complète des ordonnances et laissent
+`estJourActif()` trancher par date.
+
+Deux lecteurs, en revanche, supposent aujourd'hui **une** ordonnance par médicament et
+casseraient en silence :
+
+- `ObserverStock` indexe les ordonnances par `associateBy { medicamentId }`. Avec
+  plusieurs versions, cette fonction en retient une arbitrairement — la dernière
+  rencontrée — et projette le stock depuis une prescription qui peut être périmée. Il
+  lui faut la version en vigueur aujourd'hui.
+- `AujourdhuiViewModel` dérive l'ensemble des médicaments « à la demande » du type des
+  ordonnances. Un médicament passé de planifié à la demande porterait deux versions de
+  types différents et apparaîtrait dans les deux listes. Même correction : la version
+  en vigueur aujourd'hui.
+
+Ces deux-là sont le vrai coût caché du versionnement, et la raison pour laquelle
+`enVigueur` doit exister avant tout changement d'écriture.
 
 `DepotOrdonnances.pourMedicament(id)` devient `enVigueur(medicamentId, date)` — la
 version active à une date donnée. Deux appelants : `EditionViewModel.charger()`, qui
