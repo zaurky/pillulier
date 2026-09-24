@@ -38,6 +38,12 @@ interface OrdonnanceDao {
     )
     suspend fun cloturerVersionsAvant(medicamentId: Long, dateEffet: LocalDate, veille: LocalDate)
 
+    @Query(
+        "UPDATE ordonnance SET dateFin = :dateFin " +
+            "WHERE medicamentId = :medicamentId AND (dateFin IS NULL OR dateFin > :dateFin)",
+    )
+    suspend fun cloturerOuvertes(medicamentId: Long, dateFin: LocalDate)
+
     @Query("SELECT COUNT(*) FROM dose_prescrite WHERE ordonnanceId = :ordonnanceId")
     suspend fun comptePourOrdonnance(ordonnanceId: Long): Int
 }

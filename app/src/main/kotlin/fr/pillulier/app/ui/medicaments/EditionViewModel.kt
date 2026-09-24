@@ -6,8 +6,8 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import fr.pillulier.app.data.DepotMedicaments
 import fr.pillulier.app.data.DepotOrdonnances
 import fr.pillulier.app.temps.Horloge
+import fr.pillulier.app.usecase.ArchiverMedicament
 import fr.pillulier.app.usecase.EnregistrerMedicament
-import fr.pillulier.app.usecase.SupprimerMedicament
 import fr.pillulier.domain.DosePrescrite
 import fr.pillulier.domain.Forme
 import fr.pillulier.domain.Medicament
@@ -49,7 +49,7 @@ class EditionViewModel @Inject constructor(
     private val medicaments: DepotMedicaments,
     private val ordonnances: DepotOrdonnances,
     private val enregistrerMedicament: EnregistrerMedicament,
-    private val supprimerMedicament: SupprimerMedicament,
+    private val archiverMedicament: ArchiverMedicament,
     private val horloge: Horloge,
 ) : ViewModel() {
 
@@ -191,9 +191,9 @@ class EditionViewModel @Inject constructor(
         }
     }
 
-    fun supprimer() = viewModelScope.launch {
+    fun archiver() = viewModelScope.launch {
         val id = _etat.value.id
-        if (id != 0L) supprimerMedicament(id)
+        if (id != 0L) archiverMedicament(id)
         _etat.update { it.copy(enregistre = true) }
     }
 }

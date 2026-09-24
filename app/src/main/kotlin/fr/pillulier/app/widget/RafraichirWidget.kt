@@ -15,8 +15,8 @@ import javax.inject.Inject
  * `ReArmerRappels` recalcule — la coche et l'enregistrement à la demande
  * depuis l'écran Aujourd'hui (`AujourdhuiViewModel`), les actions *Pris* et
  * *Plus tard* d'une notification (`RecepteurActionPrise`), un changement
- * d'heure de moment (`PreferencesViewModel`), l'enregistrement ou la
- * suppression d'un médicament (`EnregistrerMedicament`, `SupprimerMedicament`),
+ * d'heure de moment (`PreferencesViewModel`), l'enregistrement ou l'archivage
+ * d'un médicament (`EnregistrerMedicament`, `ArchiverMedicament`),
  * le passage à un nouveau jour (`ClotureQuotidienne`, réveillée par l'alarme
  * exacte de minuit) et le rattrapage après
  * démarrage ou mise à jour (`RecepteurDemarrage`). `updateAll` est sans effet

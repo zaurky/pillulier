@@ -11,11 +11,11 @@ import fr.pillulier.app.data.DepotOrdonnances
 import fr.pillulier.app.data.db.PillulierDatabase
 import fr.pillulier.app.data.db.momentsParDefaut
 import fr.pillulier.app.rappels.Notifications
+import fr.pillulier.app.usecase.ArchiverMedicament
 import fr.pillulier.app.usecase.EnregistrerMedicament
 import fr.pillulier.app.usecase.HorlogeFigee
 import fr.pillulier.app.usecase.ProgrammateurEspion
 import fr.pillulier.app.usecase.ReArmerRappels
-import fr.pillulier.app.usecase.SupprimerMedicament
 import fr.pillulier.app.widget.RafraichirWidget
 import fr.pillulier.domain.Moment
 import fr.pillulier.domain.Rythme
@@ -76,8 +76,9 @@ class EditionViewModelTest {
             medicaments = medicaments,
             ordonnances = ordonnances,
             enregistrerMedicament = EnregistrerMedicament(medicaments, ordonnances, reArmer, rafraichirWidget),
-            supprimerMedicament = SupprimerMedicament(
+            archiverMedicament = ArchiverMedicament(
                 medicaments = medicaments,
+                ordonnances = ordonnances,
                 programmateur = ProgrammateurEspion(),
                 notifications = Notifications(contexte),
                 reArmerRappels = reArmer,

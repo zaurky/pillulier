@@ -75,13 +75,18 @@ class EnregistrerMedicament @Inject constructor(
 }
 
 /**
- * Le réarmement annule un surensemble bâti sur `medicaments.tous()` : une fois
- * la ligne effacée, l'identifiant en a disparu et sa fenêtre d'alarmes resterait
- * armée, sa notification devenant inatteignable — indéboulonnable si elle est
- * critique. On ferme donc sa fenêtre **avant** de supprimer.
+ * Un medicament ne se supprime pas : ses prises passees sont un journal du reel
+ * et doivent survivre au traitement. On ferme sa fenetre d alarmes, on clot son
+ * ordonnance ce soir, puis on le marque archive.
+ *
+ * La fenetre est fermee **avant** le marquage, comme elle l etait avant la
+ * suppression : le rearmement batit son surensemble sur `medicaments.tous()`,
+ * et une alarme laissee vivante deviendrait inatteignable — indeboulonnable si
+ * elle est critique.
  */
-class SupprimerMedicament @Inject constructor(
+class ArchiverMedicament @Inject constructor(
     private val medicaments: DepotMedicaments,
+    private val ordonnances: DepotOrdonnances,
     private val programmateur: ProgrammateurAlarmes,
     private val notifications: Notifications,
     private val reArmerRappels: ReArmerRappels,
@@ -90,16 +95,18 @@ class SupprimerMedicament @Inject constructor(
 ) {
     suspend operator fun invoke(medicamentId: Long) {
         val aujourdhui = horloge.aujourdhui()
-        (-1L until ReArmerRappels.JOURS_FENETRE).forEach { decalage ->
+
+        (1L until ReArmerRappels.JOURS_FENETRE).forEach { decalage ->
             val jour = aujourdhui.plusDays(decalage)
             Moment.entries.forEach { moment ->
-                val cle = CleRappel(medicamentId, jour, moment)
-                programmateur.annuler(cle)
-                notifications.retirer(cle)
+                programmateur.annuler(CleRappel(medicamentId, jour, moment))
+                notifications.retirer(CleRappel(medicamentId, jour, moment))
             }
         }
 
-        medicaments.supprimer(medicamentId)
+        ordonnances.cloturerA(medicamentId, aujourdhui)
+        medicaments.archiver(medicamentId, horloge.instant())
+
         reArmerRappels()
         rafraichirWidget()
     }

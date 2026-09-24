@@ -31,6 +31,10 @@ class DepotOrdonnances @Inject constructor(
     suspend fun versionsDe(medicamentId: Long): List<OrdonnanceAvecDoses> =
         dao.versionsDe(medicamentId).map { it.versDomaine() }
 
+    /** Ferme toutes les versions encore ouvertes au-dela de [dateFin]. */
+    suspend fun cloturerA(medicamentId: Long, dateFin: LocalDate) =
+        dao.cloturerOuvertes(medicamentId, dateFin)
+
     /**
      * La nouvelle version prend tout a partir de [dateEffet] : les versions
      * anterieures sont cloturees la veille, celles qui commencent a cette date

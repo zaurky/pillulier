@@ -28,7 +28,7 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
-import kotlin.test.assertNull
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 @RunWith(AndroidJUnit4::class)
@@ -39,7 +39,7 @@ class EnregistrerMedicamentTest {
     private lateinit var medicaments: DepotMedicaments
     private lateinit var ordonnances: DepotOrdonnances
     private lateinit var enregistrer: EnregistrerMedicament
-    private lateinit var supprimer: SupprimerMedicament
+    private lateinit var archiver: ArchiverMedicament
     private val programmateur = ProgrammateurEspion()
     private val horloge = HorlogeFigee(LocalDateTime.of(2026, 1, 5, 7, 0))
 
@@ -62,8 +62,9 @@ class EnregistrerMedicamentTest {
         )
         val rafraichirWidget = RafraichirWidget(ApplicationProvider.getApplicationContext())
         enregistrer = EnregistrerMedicament(medicaments, ordonnances, reArmer, rafraichirWidget)
-        supprimer = SupprimerMedicament(
+        archiver = ArchiverMedicament(
             medicaments = medicaments,
+            ordonnances = ordonnances,
             programmateur = programmateur,
             notifications = Notifications(ApplicationProvider.getApplicationContext()),
             reArmerRappels = reArmer,
@@ -206,7 +207,7 @@ class EnregistrerMedicamentTest {
     }
 
     @Test
-    fun `supprimer un medicament supprime son ordonnance`() = runTest {
+    fun `archiver un medicament clot son ordonnance et le marque archive`() = runTest {
         val id = enregistrer(
             medicament = levothyrox(),
             type = TypeOrdonnance.PLANIFIEE,
@@ -217,14 +218,18 @@ class EnregistrerMedicamentTest {
             dateEffet = LocalDate.of(2026, 1, 1),
         )
 
-        supprimer(id)
+        archiver(id)
 
-        assertNull(medicaments.parId(id))
-        assertTrue(ordonnances.versionsDe(id).isEmpty())
+        assertNotNull(medicaments.parId(id)!!.archiveLe, "le medicament reste connu, marque archive")
+        assertEquals(
+            LocalDate.of(2026, 1, 5),
+            ordonnances.versionsDe(id).single().ordonnance.dateFin,
+            "l ordonnance est cloturee ce soir, pas effacee",
+        )
     }
 
     @Test
-    fun `supprimer annule les alarmes du medicament avant de l effacer`() = runTest {
+    fun `archiver annule les alarmes du medicament avant de l archiver`() = runTest {
         val id = enregistrer(
             medicament = levothyrox(),
             type = TypeOrdonnance.PLANIFIEE,
@@ -236,18 +241,18 @@ class EnregistrerMedicamentTest {
         )
         programmateur.annulees.clear()
 
-        supprimer(id)
+        archiver(id)
 
-        // La veille plus la fenêtre, les quatre moments : le réarmement qui suit
-        // ne verrait plus cet identifiant dans `medicaments.tous()`.
-        val attendues = (-1L until ReArmerRappels.JOURS_FENETRE).flatMap { decalage ->
+        // La fenetre a partir de demain, les quatre moments : le rearmement qui
+        // suit reconstruit deja aujourd hui et hier sur son propre surensemble.
+        val attendues = (1L until ReArmerRappels.JOURS_FENETRE).flatMap { decalage ->
             Moment.entries.map { moment ->
                 CleRappel(id, LocalDate.of(2026, 1, 5).plusDays(decalage), moment)
             }
         }
         assertTrue(
             programmateur.annulees.containsAll(attendues),
-            "les alarmes du medicament supprime doivent etre annulees",
+            "les alarmes a venir du medicament archive doivent etre annulees",
         )
     }
 

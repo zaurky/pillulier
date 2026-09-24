@@ -36,7 +36,7 @@ class ObserverStock @Inject constructor(
     private val horloge: Horloge,
 ) {
     operator fun invoke(): Flow<List<LigneStock>> = combine(
-        medicaments.observerTous(),
+        medicaments.observerActifs(),
         ordonnances.observerToutes(),
         preferences.preferences,
     ) { tousMedicaments, toutesOrdonnances, prefs ->

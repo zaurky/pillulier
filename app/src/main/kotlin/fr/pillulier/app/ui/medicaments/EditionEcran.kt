@@ -76,7 +76,7 @@ fun EditionEcran(
                 TextButton(
                     onClick = {
                         confirmationSuppression = false
-                        vue.supprimer()
+                        vue.archiver()
                     },
                 ) {
                     Text("Supprimer")
