@@ -37,6 +37,8 @@ data class EtatEdition(
     val intervalleJours: String = "2",
     val dateDebut: LocalDate = LocalDate.now(),
     val dateFin: LocalDate? = null,
+    /** Date a partir de laquelle la prescription saisie s'applique. Jamais persistee. */
+    val dateEffet: LocalDate = LocalDate.now(),
     val doses: Map<Moment, Double> = emptyMap(),
     val seuilAlerteJours: String = "",
     val seuilAlerteUnites: String = "",
@@ -53,7 +55,9 @@ class EditionViewModel @Inject constructor(
     private val horloge: Horloge,
 ) : ViewModel() {
 
-    private val _etat = MutableStateFlow(EtatEdition(dateDebut = horloge.aujourdhui()))
+    private val _etat = MutableStateFlow(
+        EtatEdition(dateDebut = horloge.aujourdhui(), dateEffet = horloge.aujourdhui()),
+    )
     val etat: StateFlow<EtatEdition> = _etat.asStateFlow()
 
     /**
@@ -85,6 +89,9 @@ class EditionViewModel @Inject constructor(
                 ?.n?.toString() ?: "2",
             dateDebut = ordonnance?.ordonnance?.dateDebut ?: horloge.aujourdhui(),
             dateFin = ordonnance?.ordonnance?.dateFin,
+            // La date d'effet ne se relit pas de la base : chaque ouverture repart
+            // d'aujourd'hui, seule date valide pour une nouvelle version.
+            dateEffet = horloge.aujourdhui(),
             doses = ordonnance?.doses?.associate { it.moment to it.dose } ?: emptyMap(),
             seuilAlerteJours = medicament.seuilAlerteJours?.toString() ?: "",
             seuilAlerteUnites = medicament.seuilAlerteUnites?.toString() ?: "",
@@ -100,6 +107,7 @@ class EditionViewModel @Inject constructor(
     fun modifierType(valeur: TypeOrdonnance) = _etat.update { it.copy(type = valeur) }
     fun modifierDateDebut(valeur: LocalDate) = _etat.update { it.copy(dateDebut = valeur) }
     fun modifierDateFin(valeur: LocalDate?) = _etat.update { it.copy(dateFin = valeur) }
+    fun modifierDateEffet(valeur: LocalDate) = _etat.update { it.copy(dateEffet = valeur) }
     fun modifierSeuilJours(valeur: String) = _etat.update { it.copy(seuilAlerteJours = valeur) }
     fun modifierSeuilUnites(valeur: String) = _etat.update { it.copy(seuilAlerteUnites = valeur) }
 
@@ -178,12 +186,12 @@ class EditionViewModel @Inject constructor(
                 dateDebut = etat.dateDebut,
                 dateFin = etat.dateFin,
                 doses = etat.doses.map { (moment, dose) -> DosePrescrite(moment, dose) },
-                // Pas encore de selecteur de date d'effet (Task 5). Une creation
-                // n'a pas de passe a proteger : elle prend effet a la date de
-                // debut saisie, meme passee, sous peine de perdre l'ancrage du
-                // rythme. Une modification, elle, s'applique des aujourd'hui, ou
-                // a partir du debut si le traitement n'a pas encore commence.
-                dateEffet = if (etat.id == 0L) etat.dateDebut else maxOf(horloge.aujourdhui(), etat.dateDebut),
+                // Une creation n'a pas de passe a proteger : elle prend effet a la
+                // date de debut saisie, meme passee, sous peine de perdre l'ancrage
+                // du rythme (le champ « S'applique a partir du » n'est d'ailleurs
+                // pas affiche a la creation, voir EditionEcran). Une modification
+                // utilise la date d'effet saisie par l'utilisateur.
+                dateEffet = if (etat.id == 0L) etat.dateDebut else etat.dateEffet,
             )
             _etat.update { it.copy(erreur = null, enregistre = true) }
         } catch (erreur: IllegalArgumentException) {

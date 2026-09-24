@@ -210,4 +210,35 @@ class EditionViewModelTest {
             "une creation n a pas de passe a proteger : elle doit ancrer le rythme a la date saisie, pas a aujourd hui",
         )
     }
+
+    @Test
+    fun `la date d effet part sur aujourd hui`() = runTest {
+        assertEquals(horloge.aujourdhui(), vue.etat.value.dateEffet)
+    }
+
+    @Test
+    fun `la date d effet saisie est celle transmise a l enregistrement`() = runTest {
+        remplirFormulaireValide()
+        vue.enregistrer().join()
+        val id = medicaments.tous().single().id
+        vue.charger(id).join()
+
+        vue.modifierDateEffet(LocalDate.of(2026, 1, 10))
+        vue.definirDose(Moment.SOIR, 2.0)
+        vue.enregistrer().join()
+
+        val versions = ordonnances.versionsDe(id).sortedBy { it.ordonnance.dateDebut }
+        assertEquals(LocalDate.of(2026, 1, 10), versions.last().ordonnance.dateDebut)
+    }
+
+    @Test
+    fun `charger remet la date d effet sur aujourd hui`() = runTest {
+        remplirFormulaireValide()
+        vue.enregistrer().join()
+        val id = medicaments.tous().single().id
+
+        vue.charger(id).join()
+
+        assertEquals(horloge.aujourdhui(), vue.etat.value.dateEffet)
+    }
 }

@@ -61,8 +61,7 @@ fun EditionEcran(
     LaunchedEffect(etat.enregistre) { if (etat.enregistre) surSortie() }
 
     // Un médicament ne se supprime pas : il s'archive. Son historique de
-    // prises reste lisible, seul son planning à venir s'arrête. Task 5
-    // affine ce dialogue (sélecteur de date, wording final).
+    // prises reste lisible, seul son planning à venir s'arrête.
     if (confirmationSuppression) {
         AlertDialog(
             onDismissRequest = { confirmationSuppression = false },
@@ -197,6 +196,16 @@ fun EditionEcran(
                 surChangement = vue::modifierDateFin,
             )
 
+            // Visible en modification seulement : a la creation, « Début du
+            // traitement » joue deja ce role et un second champ egarerait.
+            if (etat.id != 0L) {
+                SelecteurDate(
+                    libelle = "S'applique à partir du",
+                    date = etat.dateEffet,
+                    surChangement = vue::modifierDateEffet,
+                )
+            }
+
             Text("Doses par moment", style = MaterialTheme.typography.titleSmall)
             Moment.entries.forEach { moment ->
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -232,7 +241,7 @@ fun EditionEcran(
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(onClick = { vue.enregistrer() }) { Text("Enregistrer") }
             if (etat.id != 0L) {
-                OutlinedButton(onClick = { confirmationSuppression = true }) { Text("Supprimer") }
+                OutlinedButton(onClick = { confirmationSuppression = true }) { Text("Archiver") }
             }
         }
     }

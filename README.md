@@ -32,7 +32,7 @@ jours fermés.
 |---|---|
 | **Aujourd'hui** | les prises du jour groupées par moment, avec leur statut et une case à cocher, plus une bannière pour les médicaments à renouveler |
 | **Semaine** | la grille 7 jours × 4 moments, façon pillulier physique. Lecture seule |
-| **Mes médicaments** | la liste, et l'écran d'édition : identité du médicament et ordonnance |
+| **Mes médicaments** | la liste, et l'écran d'édition : identité du médicament et ordonnance. Modifier une ordonnance ouvre une nouvelle version datée ; le planning des jours déjà passés reste figé sur la prescription qui était en vigueur ce jour-là. Retirer un médicament l'archive plutôt que de le supprimer : ses prises passées restent dans l'historique |
 | **Stock** | unités restantes, jours restants, dates d'épuisement et d'alerte, `+1 boîte` et correction manuelle |
 | **Préférences** | heures des quatre moments, délai du *Plus tard*, intervalle de relance, seuil d'alerte par défaut |
 
@@ -175,10 +175,11 @@ plutôt que cachée dans un réglage.
   Si une prise est enregistrée entre l'ouverture de la fiche et son enregistrement, la
   valeur d'avant est réécrite. La fenêtre est étroite et l'application est
   mono-utilisateur.
-- **Une seule migration Room possible.** Le schéma est en version 1, exporté dans
-  `app/schemas/`, sans `fallbackToDestructiveMigration` — délibérément, pour que le
-  premier changement de schéma s'accompagne d'une vraie migration au lieu d'effacer le
-  journal de l'utilisateur.
+- **Pas de `fallbackToDestructiveMigration`, délibérément.** Le premier changement de
+  schéma (version 1 → 2, pour `dateAncrage` et `archiveLe`) s'est fait par une vraie
+  migration, `MIGRATION_1_2`, couverte par un test dédié dans `MigrationTest` plutôt
+  que par un effacement du journal de l'utilisateur. La même discipline vaudra pour le
+  prochain changement de schéma.
 - La saisie est manuelle : pas de scan de code-barres ni de base de médicaments.
 - Pas d'écran d'historique ni d'export pour le médecin.
 - Pas de rattrapage rétroactif : une prise oubliée hier reste oubliée.
