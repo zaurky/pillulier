@@ -61,7 +61,7 @@ class PreferencesViewModelTest {
             moments = moments,
             preferences = preferences,
             reArmerRappels = ReArmerRappels(
-                ordonnances = DepotOrdonnances(base.ordonnances()),
+                ordonnances = DepotOrdonnances(base.ordonnances(), base),
                 medicaments = DepotMedicaments(base.medicaments()),
                 moments = moments,
                 evenements = DepotEvenements(base.evenements()),

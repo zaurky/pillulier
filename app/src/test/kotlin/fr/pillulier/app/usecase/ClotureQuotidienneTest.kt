@@ -66,7 +66,7 @@ class ClotureQuotidienneTest {
         cloture = ClotureQuotidienne(
             cloturerJournee = CloturerJournee(medicaments, programmateur, notifications, horloge),
             reArmerRappels = ReArmerRappels(
-                ordonnances = DepotOrdonnances(base.ordonnances()),
+                ordonnances = DepotOrdonnances(base.ordonnances(), base),
                 medicaments = medicaments,
                 moments = moments,
                 evenements = DepotEvenements(base.evenements()),
@@ -94,7 +94,7 @@ class ClotureQuotidienneTest {
                 critique = false,
             ),
         )
-        DepotOrdonnances(base.ordonnances()).enregistrer(
+        DepotOrdonnances(base.ordonnances(), base).enregistrerVersion(
             medicamentId = id,
             ordonnance = Ordonnance(
                 id = 0,
@@ -106,6 +106,7 @@ class ClotureQuotidienneTest {
                 dateAncrage = LocalDate.of(2026, 1, 1),
             ),
             doses = listOf(DosePrescrite(Moment.MATIN, 1.0)),
+            dateEffet = LocalDate.of(2026, 1, 1),
         )
         return id
     }

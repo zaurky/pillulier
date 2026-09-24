@@ -72,7 +72,7 @@ class AujourdhuiViewModelTest {
             .build()
 
         val medicaments = DepotMedicaments(base.medicaments())
-        val ordonnances = DepotOrdonnances(base.ordonnances())
+        val ordonnances = DepotOrdonnances(base.ordonnances(), base)
         val moments = DepotMoments(base.moments())
         val evenements = DepotEvenements(base.evenements())
         val preferences = DepotPreferences(contexte)

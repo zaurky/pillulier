@@ -49,7 +49,7 @@ class ObserverStockTest {
         ).addCallback(momentsParDefaut).allowMainThreadQueries().build()
 
         medicaments = DepotMedicaments(base.medicaments())
-        ordonnances = DepotOrdonnances(base.ordonnances())
+        ordonnances = DepotOrdonnances(base.ordonnances(), base)
         observer = ObserverStock(
             medicaments = medicaments,
             ordonnances = ordonnances,
@@ -75,7 +75,7 @@ class ObserverStockTest {
                 critique = false,
             ),
         )
-        ordonnances.enregistrer(
+        ordonnances.enregistrerVersion(
             medicamentId = id,
             ordonnance = Ordonnance(
                 id = 0,
@@ -87,6 +87,7 @@ class ObserverStockTest {
                 dateAncrage = LocalDate.of(2026, 1, 1),
             ),
             doses = listOf(DosePrescrite(Moment.MATIN, 1.0)),
+            dateEffet = LocalDate.of(2026, 1, 1),
         )
         return id
     }
@@ -189,7 +190,7 @@ class ObserverStockTest {
                 critique = false,
             ),
         )
-        ordonnances.enregistrer(
+        ordonnances.enregistrerVersion(
             medicamentId = id,
             ordonnance = Ordonnance(
                 id = 0,
@@ -201,6 +202,7 @@ class ObserverStockTest {
                 dateAncrage = LocalDate.of(2026, 1, 1),
             ),
             doses = emptyList(),
+            dateEffet = LocalDate.of(2026, 1, 1),
         )
 
         val ligne = observer().first().single()

@@ -63,7 +63,7 @@ class ReArmerRappelsTest {
             PillulierDatabase::class.java,
         ).addCallback(momentsParDefaut).allowMainThreadQueries().build()
         medicaments = DepotMedicaments(base.medicaments())
-        ordonnances = DepotOrdonnances(base.ordonnances())
+        ordonnances = DepotOrdonnances(base.ordonnances(), base)
         enregistrer = EnregistrerPrise(base, base.evenements(), base.medicaments(), horloge)
         reArmer = ReArmerRappels(
             ordonnances = ordonnances,
@@ -96,7 +96,7 @@ class ReArmerRappelsTest {
                 critique = critique,
             ),
         )
-        ordonnances.enregistrer(
+        ordonnances.enregistrerVersion(
             medicamentId = id,
             ordonnance = Ordonnance(
                 id = 0,
@@ -108,6 +108,7 @@ class ReArmerRappelsTest {
                 dateAncrage = LocalDate.of(2026, 1, 1),
             ),
             doses = doses,
+            dateEffet = LocalDate.of(2026, 1, 1),
         )
         return id
     }
@@ -192,7 +193,7 @@ class ReArmerRappelsTest {
         programmateur.annulees.clear()
 
         // L'ordonnance perd sa dose du soir.
-        ordonnances.enregistrer(
+        ordonnances.enregistrerVersion(
             medicamentId = id,
             ordonnance = Ordonnance(
                 id = 0,
@@ -204,6 +205,7 @@ class ReArmerRappelsTest {
                 dateAncrage = LocalDate.of(2026, 1, 1),
             ),
             doses = listOf(DosePrescrite(Moment.MATIN, 1.0)),
+            dateEffet = LocalDate.of(2026, 1, 1),
         )
         reArmer()
 
@@ -226,7 +228,7 @@ class ReArmerRappelsTest {
                 critique = false,
             ),
         )
-        ordonnances.enregistrer(
+        ordonnances.enregistrerVersion(
             medicamentId = id,
             ordonnance = Ordonnance(
                 id = 0,
@@ -238,6 +240,7 @@ class ReArmerRappelsTest {
                 dateAncrage = LocalDate.of(2026, 1, 1),
             ),
             doses = emptyList(),
+            dateEffet = LocalDate.of(2026, 1, 1),
         )
 
         reArmer()

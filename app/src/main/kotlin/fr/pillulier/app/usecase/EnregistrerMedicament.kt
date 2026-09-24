@@ -33,11 +33,15 @@ class EnregistrerMedicament @Inject constructor(
         dateDebut: LocalDate,
         dateFin: LocalDate?,
         doses: List<DosePrescrite>,
+        dateEffet: LocalDate,
     ): Long {
         require(medicament.nom.isNotBlank()) { "le nom du medicament est obligatoire" }
         require(medicament.unitesParBoite > 0) { "une boite contient au moins une unite" }
         require(dateFin == null || !dateFin.isBefore(dateDebut)) {
             "la date de fin ne peut pas preceder la date de debut"
+        }
+        require(!dateEffet.isBefore(dateDebut)) {
+            "la date d effet ne peut pas preceder le debut du traitement"
         }
         if (type == TypeOrdonnance.PLANIFIEE) {
             require(doses.isNotEmpty()) { "une ordonnance planifiee doit porter au moins une dose" }
@@ -49,18 +53,19 @@ class EnregistrerMedicament @Inject constructor(
 
         val id = medicaments.enregistrer(medicament)
 
-        ordonnances.enregistrer(
+        ordonnances.enregistrerVersion(
             medicamentId = id,
             ordonnance = Ordonnance(
                 id = 0,
                 medicamentId = id,
                 type = type,
                 rythme = rythme,
-                dateDebut = dateDebut,
+                dateDebut = dateEffet,
                 dateFin = dateFin,
-                dateAncrage = dateDebut,
+                dateAncrage = dateEffet,
             ),
             doses = if (type == TypeOrdonnance.PLANIFIEE) doses else emptyList(),
+            dateEffet = maxOf(dateEffet, dateDebut),
         )
 
         reArmerRappels()

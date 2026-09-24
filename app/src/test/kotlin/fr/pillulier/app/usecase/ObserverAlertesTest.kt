@@ -45,7 +45,7 @@ class ObserverAlertesTest {
         ).addCallback(momentsParDefaut).allowMainThreadQueries().build()
 
         medicaments = DepotMedicaments(base.medicaments())
-        ordonnances = DepotOrdonnances(base.ordonnances())
+        ordonnances = DepotOrdonnances(base.ordonnances(), base)
         observer = ObserverAlertes(
             ObserverStock(
                 medicaments = medicaments,
@@ -73,7 +73,7 @@ class ObserverAlertesTest {
                 critique = false,
             ),
         )
-        ordonnances.enregistrer(
+        ordonnances.enregistrerVersion(
             medicamentId = id,
             ordonnance = Ordonnance(
                 id = 0,
@@ -85,6 +85,7 @@ class ObserverAlertesTest {
                 dateAncrage = LocalDate.of(2026, 1, 1),
             ),
             doses = listOf(DosePrescrite(Moment.MATIN, 1.0)),
+            dateEffet = LocalDate.of(2026, 1, 1),
         )
         return id
     }
@@ -124,7 +125,7 @@ class ObserverAlertesTest {
                 critique = false,
             ),
         )
-        ordonnances.enregistrer(
+        ordonnances.enregistrerVersion(
             medicamentId = id,
             ordonnance = Ordonnance(
                 id = 0,
@@ -136,6 +137,7 @@ class ObserverAlertesTest {
                 dateAncrage = LocalDate.of(2026, 1, 1),
             ),
             doses = emptyList(),
+            dateEffet = LocalDate.of(2026, 1, 1),
         )
 
         val alertes = observer().first()
@@ -158,7 +160,7 @@ class ObserverAlertesTest {
                 critique = false,
             ),
         )
-        ordonnances.enregistrer(
+        ordonnances.enregistrerVersion(
             medicamentId = id,
             ordonnance = Ordonnance(
                 id = 0,
@@ -170,6 +172,7 @@ class ObserverAlertesTest {
                 dateAncrage = LocalDate.of(2026, 1, 1),
             ),
             doses = emptyList(),
+            dateEffet = LocalDate.of(2026, 1, 1),
         )
 
         assertEquals(emptyList(), observer().first())

@@ -38,7 +38,7 @@ class DepotOrdonnancesTest {
             PillulierDatabase::class.java,
         ).addCallback(momentsParDefaut).allowMainThreadQueries().build()
         medicaments = DepotMedicaments(base.medicaments())
-        ordonnances = DepotOrdonnances(base.ordonnances())
+        ordonnances = DepotOrdonnances(base.ordonnances(), base)
         moments = DepotMoments(base.moments())
     }
 
@@ -61,7 +61,7 @@ class DepotOrdonnancesTest {
     fun `enregistrer une ordonnance puis la relire conserve le rythme et les doses`() = runTest {
         val medicamentId = medicaments.enregistrer(medicament())
 
-        ordonnances.enregistrer(
+        ordonnances.enregistrerVersion(
             medicamentId = medicamentId,
             ordonnance = Ordonnance(
                 id = 0,
@@ -73,6 +73,7 @@ class DepotOrdonnancesTest {
                 dateAncrage = LocalDate.of(2026, 1, 1),
             ),
             doses = listOf(DosePrescrite(Moment.MATIN, 1.0)),
+            dateEffet = LocalDate.of(2026, 1, 1),
         )
 
         val relue = ordonnances.versionsDe(medicamentId).single()
@@ -94,8 +95,9 @@ class DepotOrdonnancesTest {
             dateAncrage = LocalDate.of(2026, 1, 1),
         )
 
-        ordonnances.enregistrer(medicamentId, ordonnance, listOf(DosePrescrite(Moment.MATIN, 1.0)))
-        ordonnances.enregistrer(medicamentId, ordonnance, listOf(DosePrescrite(Moment.SOIR, 2.0)))
+        val dateEffet = LocalDate.of(2026, 1, 1)
+        ordonnances.enregistrerVersion(medicamentId, ordonnance, listOf(DosePrescrite(Moment.MATIN, 1.0)), dateEffet)
+        ordonnances.enregistrerVersion(medicamentId, ordonnance, listOf(DosePrescrite(Moment.SOIR, 2.0)), dateEffet)
 
         val relue = ordonnances.versionsDe(medicamentId).single()
 

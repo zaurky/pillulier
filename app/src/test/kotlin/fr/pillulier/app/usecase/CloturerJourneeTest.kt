@@ -78,7 +78,7 @@ class CloturerJourneeTest {
                 critique = false,
             ),
         )
-        DepotOrdonnances(base.ordonnances()).enregistrer(
+        DepotOrdonnances(base.ordonnances(), base).enregistrerVersion(
             medicamentId = id,
             ordonnance = Ordonnance(
                 id = 0,
@@ -90,6 +90,7 @@ class CloturerJourneeTest {
                 dateAncrage = LocalDate.of(2026, 1, 1),
             ),
             doses = listOf(DosePrescrite(Moment.MATIN, 1.0)),
+            dateEffet = LocalDate.of(2026, 1, 1),
         )
         return id
     }

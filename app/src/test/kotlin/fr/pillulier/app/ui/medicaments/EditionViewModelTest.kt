@@ -60,7 +60,7 @@ class EditionViewModelTest {
             .build()
 
         medicaments = DepotMedicaments(base.medicaments())
-        ordonnances = DepotOrdonnances(base.ordonnances())
+        ordonnances = DepotOrdonnances(base.ordonnances(), base)
         val reArmer = ReArmerRappels(
             ordonnances = ordonnances,
             medicaments = medicaments,
