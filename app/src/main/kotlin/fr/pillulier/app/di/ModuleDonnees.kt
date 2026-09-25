@@ -11,6 +11,7 @@ import fr.pillulier.app.data.db.EvenementPriseDao
 import fr.pillulier.app.data.db.MedicamentDao
 import fr.pillulier.app.data.db.MomentConfigDao
 import fr.pillulier.app.data.db.OrdonnanceDao
+import fr.pillulier.app.data.db.MIGRATION_1_2
 import fr.pillulier.app.data.db.PillulierDatabase
 import fr.pillulier.app.data.db.momentsParDefaut
 import javax.inject.Singleton
@@ -24,6 +25,7 @@ object ModuleDonnees {
     fun base(@ApplicationContext contexte: Context): PillulierDatabase =
         Room.databaseBuilder(contexte, PillulierDatabase::class.java, "pillulier.db")
             .addCallback(momentsParDefaut)
+            .addMigrations(MIGRATION_1_2)
             .build()
 
     @Provides fun medicamentDao(base: PillulierDatabase): MedicamentDao = base.medicaments()

@@ -45,14 +45,24 @@ class PreferencesViewModel @Inject constructor(
     }
 
     fun definirDelaiPlusTard(minutes: Int): Job = viewModelScope.launch {
-        preferences.definirDelaiPlusTard(minutes)
+        preferences.definirDelaiPlusTard(minutes.coerceAtLeast(MINUTES_MINIMUM))
     }
 
     fun definirIntervalleRelance(minutes: Int): Job = viewModelScope.launch {
-        preferences.definirIntervalleRelance(minutes)
+        preferences.definirIntervalleRelance(minutes.coerceAtLeast(MINUTES_MINIMUM))
     }
 
     fun definirSeuilJours(jours: Int): Job = viewModelScope.launch {
-        preferences.definirSeuilAlerteJours(jours)
+        preferences.definirSeuilAlerteJours(jours.coerceAtLeast(JOURS_MINIMUM))
+    }
+
+    /**
+     * Les bornes vivent ici et non dans l'ecran : `DepotPreferences.ecrire`
+     * exige une valeur strictement positive, et la violer leve dans la
+     * coroutine — l'ecriture serait perdue sans bruit.
+     */
+    private companion object {
+        const val MINUTES_MINIMUM = 5
+        const val JOURS_MINIMUM = 1
     }
 }

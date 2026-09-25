@@ -61,7 +61,7 @@ class PreferencesViewModelTest {
             moments = moments,
             preferences = preferences,
             reArmerRappels = ReArmerRappels(
-                ordonnances = DepotOrdonnances(base.ordonnances()),
+                ordonnances = DepotOrdonnances(base.ordonnances(), base),
                 medicaments = DepotMedicaments(base.medicaments()),
                 moments = moments,
                 evenements = DepotEvenements(base.evenements()),
@@ -113,5 +113,26 @@ class PreferencesViewModelTest {
         preferences.marquerAutorisationsVues()
 
         assertEquals(true, preferences.autorisationsVues.first())
+    }
+
+    @Test
+    fun `un delai plus tard sous cinq minutes est ramene a cinq`() = runTest {
+        vue.definirDelaiPlusTard(2).join()
+
+        assertEquals(5, preferences.instantane().delaiPlusTardMinutes)
+    }
+
+    @Test
+    fun `un intervalle de relance sous cinq minutes est ramene a cinq`() = runTest {
+        vue.definirIntervalleRelance(0).join()
+
+        assertEquals(5, preferences.instantane().intervalleRelanceMinutes)
+    }
+
+    @Test
+    fun `un seuil d alerte sous un jour est ramene a un`() = runTest {
+        vue.definirSeuilJours(0).join()
+
+        assertEquals(1, preferences.instantane().seuilAlerteJoursDefaut)
     }
 }

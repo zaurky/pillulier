@@ -52,7 +52,7 @@ class ObserverSemaineTest {
         ).addCallback(momentsParDefaut).allowMainThreadQueries().build()
 
         medicaments = DepotMedicaments(base.medicaments())
-        ordonnances = DepotOrdonnances(base.ordonnances())
+        ordonnances = DepotOrdonnances(base.ordonnances(), base)
         enregistrer = EnregistrerPrise(base, base.evenements(), base.medicaments(), horloge)
         observer = ObserverSemaine(
             medicaments = medicaments,
@@ -80,7 +80,7 @@ class ObserverSemaineTest {
                 critique = false,
             ),
         )
-        ordonnances.enregistrer(
+        ordonnances.enregistrerVersion(
             medicamentId = id,
             ordonnance = Ordonnance(
                 id = 0,
@@ -89,8 +89,10 @@ class ObserverSemaineTest {
                 rythme = rythme,
                 dateDebut = LocalDate.of(2026, 1, 1),
                 dateFin = null,
+                dateAncrage = LocalDate.of(2026, 1, 1),
             ),
             doses = doses,
+            dateEffet = LocalDate.of(2026, 1, 1),
         )
         return id
     }

@@ -4,8 +4,8 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
 import androidx.room.Transaction
-import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
+import java.time.LocalDate
 
 @Dao
 interface OrdonnanceDao {
@@ -19,20 +19,30 @@ interface OrdonnanceDao {
     suspend fun toutes(): List<OrdonnanceAvecDosesEntity>
 
     @Transaction
-    @Query("SELECT * FROM ordonnance WHERE medicamentId = :medicamentId")
-    suspend fun pourMedicament(medicamentId: Long): OrdonnanceAvecDosesEntity?
+    @Query("SELECT * FROM ordonnance WHERE medicamentId = :medicamentId ORDER BY dateDebut")
+    suspend fun versionsDe(medicamentId: Long): List<OrdonnanceAvecDosesEntity>
 
     @Insert
     suspend fun insererOrdonnance(ordonnance: OrdonnanceEntity): Long
 
-    @Update
-    suspend fun mettreAJourOrdonnance(ordonnance: OrdonnanceEntity)
-
     @Insert
     suspend fun insererDoses(doses: List<DosePrescriteEntity>)
 
-    @Query("DELETE FROM dose_prescrite WHERE ordonnanceId = :ordonnanceId")
-    suspend fun supprimerDoses(ordonnanceId: Long)
+    @Query("DELETE FROM ordonnance WHERE medicamentId = :medicamentId AND dateDebut >= :dateEffet")
+    suspend fun supprimerVersionsDepuis(medicamentId: Long, dateEffet: LocalDate)
+
+    @Query(
+        "UPDATE ordonnance SET dateFin = :veille " +
+            "WHERE medicamentId = :medicamentId AND dateDebut < :dateEffet " +
+            "AND (dateFin IS NULL OR dateFin >= :dateEffet)",
+    )
+    suspend fun cloturerVersionsAvant(medicamentId: Long, dateEffet: LocalDate, veille: LocalDate)
+
+    @Query(
+        "UPDATE ordonnance SET dateFin = :dateFin " +
+            "WHERE medicamentId = :medicamentId AND (dateFin IS NULL OR dateFin > :dateFin)",
+    )
+    suspend fun cloturerOuvertes(medicamentId: Long, dateFin: LocalDate)
 
     @Query("SELECT COUNT(*) FROM dose_prescrite WHERE ordonnanceId = :ordonnanceId")
     suspend fun comptePourOrdonnance(ordonnanceId: Long): Int

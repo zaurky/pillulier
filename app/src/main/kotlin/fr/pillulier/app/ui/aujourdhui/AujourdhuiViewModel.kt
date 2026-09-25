@@ -17,6 +17,7 @@ import fr.pillulier.app.widget.RafraichirWidget
 import fr.pillulier.domain.CleRappel
 import fr.pillulier.domain.Medicament
 import fr.pillulier.domain.TypeOrdonnance
+import fr.pillulier.domain.enVigueur
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -46,20 +47,27 @@ class AujourdhuiViewModel @Inject constructor(
     val etat: StateFlow<EtatAujourdhui> = combine(
         observerJournee(horloge.aujourdhui()),
         observerAlertes(),
-        medicaments.observerTous(),
+        // Les archivés doivent quitter cette liste : leur ordonnance est close,
+        // donc `enVigueur` retombe à jamais sur la dernière version connue —
+        // encore « à la demande » — et le médicament retiré resterait proposé.
+        medicaments.observerActifs(),
         ordonnances.observerToutes(),
-    ) { lignes, alertes, tous, toutesOrdonnances ->
+    ) { lignes, alertes, actifs, toutesOrdonnances ->
         // Les médicaments à la demande n'ont aucune prise planifiée : ils sont
         // proposés à part, pour un enregistrement ponctuel.
-        val idsALaDemande = toutesOrdonnances
-            .filter { it.ordonnance.type == TypeOrdonnance.A_LA_DEMANDE }
-            .map { it.ordonnance.medicamentId }
+        val aujourdhui = horloge.aujourdhui()
+        val idsALaDemande = actifs
+            .map { it.id }
+            .filter { id ->
+                toutesOrdonnances.enVigueur(id, aujourdhui)?.ordonnance?.type ==
+                    TypeOrdonnance.A_LA_DEMANDE
+            }
             .toSet()
 
         EtatAujourdhui(
             lignes = lignes,
             alertes = alertes,
-            aLaDemande = tous.filter { it.id in idsALaDemande },
+            aLaDemande = actifs.filter { it.id in idsALaDemande },
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), EtatAujourdhui())
 

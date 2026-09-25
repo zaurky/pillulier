@@ -24,9 +24,11 @@ data class MedicamentEntity(
     val seuilAlerteJours: Int?,
     val seuilAlerteUnites: Int?,
     val critique: Boolean,
+    /** Non nul = retire de la liste et du planning, mais son historique demeure. */
+    val archiveLe: Instant? = null,
 )
 
-/** Un médicament porte au plus une ordonnance : l'index sur `medicamentId` est unique. */
+/** Un medicament porte N ordonnances, disjointes dans le temps. */
 @Entity(
     tableName = "ordonnance",
     foreignKeys = [
@@ -37,7 +39,7 @@ data class MedicamentEntity(
             onDelete = ForeignKey.CASCADE,
         ),
     ],
-    indices = [Index(value = ["medicamentId"], unique = true)],
+    indices = [Index(value = ["medicamentId", "dateDebut"])],
 )
 data class OrdonnanceEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -50,6 +52,7 @@ data class OrdonnanceEntity(
     val rythmeN: Int?,
     val dateDebut: LocalDate,
     val dateFin: LocalDate?,
+    val dateAncrage: LocalDate,
 )
 
 @Entity(
@@ -89,7 +92,7 @@ data class MomentConfigEntity(
             entity = MedicamentEntity::class,
             parentColumns = ["id"],
             childColumns = ["medicamentId"],
-            onDelete = ForeignKey.CASCADE,
+            onDelete = ForeignKey.RESTRICT,
         ),
     ],
     indices = [

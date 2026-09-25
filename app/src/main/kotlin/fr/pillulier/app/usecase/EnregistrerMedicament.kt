@@ -33,11 +33,25 @@ class EnregistrerMedicament @Inject constructor(
         dateDebut: LocalDate,
         dateFin: LocalDate?,
         doses: List<DosePrescrite>,
+        dateEffet: LocalDate,
     ): Long {
         require(medicament.nom.isNotBlank()) { "le nom du medicament est obligatoire" }
         require(medicament.unitesParBoite > 0) { "une boite contient au moins une unite" }
         require(dateFin == null || !dateFin.isBefore(dateDebut)) {
             "la date de fin ne peut pas preceder la date de debut"
+        }
+        // Le garde ne tient qu a la creation, seul moment ou `dateDebut` porte
+        // vraiment le debut du traitement. A la modification, l ecran l a rempli
+        // avec le debut de la version en vigueur : le comparer refuserait de
+        // renommer un traitement date du futur, et interdirait une correction
+        // retroactive remontant avant la version courante — ce que
+        // `supprimerVersionsDepuis` existe precisement pour servir. Le debut du
+        // traitement, lui, se corrige lui aussi retroactivement : il n offre
+        // donc aucune borne inferieure a opposer a la date d effet.
+        if (medicament.id == 0L) {
+            require(!dateEffet.isBefore(dateDebut)) {
+                "la date d effet ne peut pas preceder le debut du traitement"
+            }
         }
         if (type == TypeOrdonnance.PLANIFIEE) {
             require(doses.isNotEmpty()) { "une ordonnance planifiee doit porter au moins une dose" }
@@ -49,17 +63,19 @@ class EnregistrerMedicament @Inject constructor(
 
         val id = medicaments.enregistrer(medicament)
 
-        ordonnances.enregistrer(
+        ordonnances.enregistrerVersion(
             medicamentId = id,
             ordonnance = Ordonnance(
                 id = 0,
                 medicamentId = id,
                 type = type,
                 rythme = rythme,
-                dateDebut = dateDebut,
+                dateDebut = dateEffet,
                 dateFin = dateFin,
+                dateAncrage = dateEffet,
             ),
             doses = if (type == TypeOrdonnance.PLANIFIEE) doses else emptyList(),
+            dateEffet = dateEffet,
         )
 
         reArmerRappels()
@@ -69,13 +85,18 @@ class EnregistrerMedicament @Inject constructor(
 }
 
 /**
- * Le réarmement annule un surensemble bâti sur `medicaments.tous()` : une fois
- * la ligne effacée, l'identifiant en a disparu et sa fenêtre d'alarmes resterait
- * armée, sa notification devenant inatteignable — indéboulonnable si elle est
- * critique. On ferme donc sa fenêtre **avant** de supprimer.
+ * Un medicament ne se supprime pas : ses prises passees sont un journal du reel
+ * et doivent survivre au traitement. On ferme sa fenetre d alarmes, on clot son
+ * ordonnance ce soir, puis on le marque archive.
+ *
+ * La fenetre est fermee **avant** le marquage, comme elle l etait avant la
+ * suppression : le rearmement batit son surensemble sur `medicaments.tous()`,
+ * et une alarme laissee vivante deviendrait inatteignable — indeboulonnable si
+ * elle est critique.
  */
-class SupprimerMedicament @Inject constructor(
+class ArchiverMedicament @Inject constructor(
     private val medicaments: DepotMedicaments,
+    private val ordonnances: DepotOrdonnances,
     private val programmateur: ProgrammateurAlarmes,
     private val notifications: Notifications,
     private val reArmerRappels: ReArmerRappels,
@@ -84,16 +105,18 @@ class SupprimerMedicament @Inject constructor(
 ) {
     suspend operator fun invoke(medicamentId: Long) {
         val aujourdhui = horloge.aujourdhui()
-        (-1L until ReArmerRappels.JOURS_FENETRE).forEach { decalage ->
+
+        (1L until ReArmerRappels.JOURS_FENETRE).forEach { decalage ->
             val jour = aujourdhui.plusDays(decalage)
             Moment.entries.forEach { moment ->
-                val cle = CleRappel(medicamentId, jour, moment)
-                programmateur.annuler(cle)
-                notifications.retirer(cle)
+                programmateur.annuler(CleRappel(medicamentId, jour, moment))
+                notifications.retirer(CleRappel(medicamentId, jour, moment))
             }
         }
 
-        medicaments.supprimer(medicamentId)
+        ordonnances.cloturerA(medicamentId, aujourdhui)
+        medicaments.archiver(medicamentId, horloge.instant())
+
         reArmerRappels()
         rafraichirWidget()
     }

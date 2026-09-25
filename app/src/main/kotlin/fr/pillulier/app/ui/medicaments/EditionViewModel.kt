@@ -6,12 +6,15 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import fr.pillulier.app.data.DepotMedicaments
 import fr.pillulier.app.data.DepotOrdonnances
 import fr.pillulier.app.temps.Horloge
+import fr.pillulier.app.usecase.ArchiverMedicament
 import fr.pillulier.app.usecase.EnregistrerMedicament
-import fr.pillulier.app.usecase.SupprimerMedicament
 import fr.pillulier.domain.DosePrescrite
 import fr.pillulier.domain.Forme
 import fr.pillulier.domain.Medicament
 import fr.pillulier.domain.Moment
+import fr.pillulier.domain.Ordonnance
+import fr.pillulier.domain.enVigueur
+import fr.pillulier.domain.prescritLaMemeChose
 import fr.pillulier.domain.Rythme
 import fr.pillulier.domain.TypeOrdonnance
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -20,6 +23,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.DayOfWeek
+import java.time.Instant
 import java.time.LocalDate
 import javax.inject.Inject
 
@@ -31,14 +35,25 @@ data class EtatEdition(
     val unitesParBoite: String = "30",
     val stockUnites: String = "0",
     val critique: Boolean = false,
+    /** Reporté tel quel à l'enregistrement : `@Update` réécrit la ligne entière. */
+    val archiveLe: Instant? = null,
     val type: TypeOrdonnance = TypeOrdonnance.PLANIFIEE,
     val rythme: Rythme = Rythme.TousLesJours,
+    /** Texte brut du champ « un jour sur N » ; `rythme` ne peut pas porter une saisie en cours. */
+    val intervalleJours: String = "2",
     val dateDebut: LocalDate = LocalDate.now(),
     val dateFin: LocalDate? = null,
+    /** Date a partir de laquelle la prescription saisie s'applique. Jamais persistee. */
+    val dateEffet: LocalDate = LocalDate.now(),
     val doses: Map<Moment, Double> = emptyMap(),
     val seuilAlerteJours: String = "",
     val seuilAlerteUnites: String = "",
     val erreur: String? = null,
+    /**
+     * Non nul = l'enregistrement attend une confirmation, et voici combien de
+     * versions de prescription la date d'effet saisie ferait disparaitre.
+     */
+    val versionsAEffacer: Int? = null,
     val enregistre: Boolean = false,
 )
 
@@ -47,11 +62,13 @@ class EditionViewModel @Inject constructor(
     private val medicaments: DepotMedicaments,
     private val ordonnances: DepotOrdonnances,
     private val enregistrerMedicament: EnregistrerMedicament,
-    private val supprimerMedicament: SupprimerMedicament,
+    private val archiverMedicament: ArchiverMedicament,
     private val horloge: Horloge,
 ) : ViewModel() {
 
-    private val _etat = MutableStateFlow(EtatEdition(dateDebut = horloge.aujourdhui()))
+    private val _etat = MutableStateFlow(
+        EtatEdition(dateDebut = horloge.aujourdhui(), dateEffet = horloge.aujourdhui()),
+    )
     val etat: StateFlow<EtatEdition> = _etat.asStateFlow()
 
     /**
@@ -67,7 +84,7 @@ class EditionViewModel @Inject constructor(
         dejaCharge = true
 
         val medicament = medicaments.parId(medicamentId) ?: return@launch
-        val ordonnance = ordonnances.pourMedicament(medicamentId)
+        val ordonnance = ordonnances.enVigueur(medicamentId, horloge.aujourdhui())
 
         _etat.value = EtatEdition(
             id = medicament.id,
@@ -77,10 +94,16 @@ class EditionViewModel @Inject constructor(
             unitesParBoite = medicament.unitesParBoite.toString(),
             stockUnites = medicament.stockUnites.toString(),
             critique = medicament.critique,
+            archiveLe = medicament.archiveLe,
             type = ordonnance?.ordonnance?.type ?: TypeOrdonnance.PLANIFIEE,
             rythme = ordonnance?.ordonnance?.rythme ?: Rythme.TousLesJours,
+            intervalleJours = (ordonnance?.ordonnance?.rythme as? Rythme.UnJourSurN)
+                ?.n?.toString() ?: "2",
             dateDebut = ordonnance?.ordonnance?.dateDebut ?: horloge.aujourdhui(),
             dateFin = ordonnance?.ordonnance?.dateFin,
+            // La date d'effet ne se relit pas de la base : chaque ouverture repart
+            // d'aujourd'hui, seule date valide pour une nouvelle version.
+            dateEffet = horloge.aujourdhui(),
             doses = ordonnance?.doses?.associate { it.moment to it.dose } ?: emptyMap(),
             seuilAlerteJours = medicament.seuilAlerteJours?.toString() ?: "",
             seuilAlerteUnites = medicament.seuilAlerteUnites?.toString() ?: "",
@@ -96,6 +119,7 @@ class EditionViewModel @Inject constructor(
     fun modifierType(valeur: TypeOrdonnance) = _etat.update { it.copy(type = valeur) }
     fun modifierDateDebut(valeur: LocalDate) = _etat.update { it.copy(dateDebut = valeur) }
     fun modifierDateFin(valeur: LocalDate?) = _etat.update { it.copy(dateFin = valeur) }
+    fun modifierDateEffet(valeur: LocalDate) = _etat.update { it.copy(dateEffet = valeur) }
     fun modifierSeuilJours(valeur: String) = _etat.update { it.copy(seuilAlerteJours = valeur) }
     fun modifierSeuilUnites(valeur: String) = _etat.update { it.copy(seuilAlerteUnites = valeur) }
 
@@ -109,8 +133,20 @@ class EditionViewModel @Inject constructor(
         )
     }
 
-    fun choisirUnJourSurN(n: Int) = _etat.update {
-        it.copy(rythme = if (n >= 2) Rythme.UnJourSurN(n) else Rythme.TousLesJours)
+    fun choisirUnJourSurN() = _etat.update {
+        it.copy(rythme = Rythme.UnJourSurN(it.intervalleJours.toIntOrNull()?.takeIf(::intervalleValide) ?: 2))
+    }
+
+    /**
+     * Le champ garde la saisie telle quelle ; le rythme ne suit que si elle se
+     * lit, parce que `UnJourSurN` refuse un N inférieur à deux.
+     */
+    fun modifierIntervalle(valeur: String) = _etat.update { etat ->
+        val n = valeur.toIntOrNull()
+        etat.copy(
+            intervalleJours = valeur,
+            rythme = if (n != null && intervalleValide(n)) Rythme.UnJourSurN(n) else etat.rythme,
+        )
     }
 
     /** Une dose nulle retire le moment de l'ordonnance. */
@@ -137,6 +173,63 @@ class EditionViewModel @Inject constructor(
             _etat.update { it.copy(erreur = "Stock : nombre illisible") }
             return@launch
         }
+        if (etat.rythme is Rythme.UnJourSurN &&
+            etat.intervalleJours.toIntOrNull()?.let(::intervalleValide) != true
+        ) {
+            _etat.update { it.copy(erreur = "Un jour sur : au moins 2 jours") }
+            return@launch
+        }
+
+        val dateEffet = if (etat.id == 0L) etat.dateDebut else etat.dateEffet
+
+        // Remonter avant la plus ancienne prescription effacerait toutes les
+        // versions d'un coup — geste legitime, mais indiscernable d'une annee
+        // mal tapee dans le selecteur. On compte ce qui disparaitrait et on
+        // laisse l'ecran demander confirmation.
+        if (etat.id != 0L) {
+            val existantes = ordonnances.versionsDe(etat.id)
+            val plusAncienne = existantes.minByOrNull { it.ordonnance.dateDebut }?.ordonnance?.dateDebut
+            // Une prescription inchangee n'ecrit rien, quelle que soit la date
+            // d'effet : alarmer sur un simple renommage serait une fausse alerte.
+            val changeQuelqueChose = existantes.enVigueur(etat.id, dateEffet)
+                ?.prescritLaMemeChose(ordonnanceSaisie(etat, dateEffet), dosesSaisies(etat)) != true
+
+            if (plusAncienne != null && dateEffet < plusAncienne && changeQuelqueChose) {
+                _etat.update { it.copy(erreur = null, versionsAEffacer = existantes.size) }
+                return@launch
+            }
+        }
+
+        ecrire(etat, dateEffet)
+    }
+
+    /** L'utilisateur a vu combien de versions disparaissent et maintient. */
+    fun confirmerEffacement() = viewModelScope.launch {
+        val etat = _etat.value
+        _etat.update { it.copy(versionsAEffacer = null) }
+        ecrire(etat, if (etat.id == 0L) etat.dateDebut else etat.dateEffet)
+    }
+
+    /** L'utilisateur renonce : rien n'a ete ecrit, l'ecran reste ouvert. */
+    fun renoncerEffacement() = _etat.update { it.copy(versionsAEffacer = null) }
+
+    private fun dosesSaisies(etat: EtatEdition): List<DosePrescrite> =
+        etat.doses.map { (moment, dose) -> DosePrescrite(moment, dose) }
+
+    /** L'ordonnance telle que le formulaire la decrit, pour comparaison. */
+    private fun ordonnanceSaisie(etat: EtatEdition, dateEffet: LocalDate) = Ordonnance(
+        id = 0,
+        medicamentId = etat.id,
+        type = etat.type,
+        rythme = etat.rythme,
+        dateDebut = dateEffet,
+        dateFin = etat.dateFin,
+        dateAncrage = dateEffet,
+    )
+
+    private suspend fun ecrire(etat: EtatEdition, dateEffet: LocalDate) {
+        val unitesParBoite = etat.unitesParBoite.toIntOrNull()
+        val stockUnites = etat.stockUnites.replace(',', '.').toDoubleOrNull()
 
         try {
             enregistrerMedicament(
@@ -150,12 +243,19 @@ class EditionViewModel @Inject constructor(
                     seuilAlerteJours = etat.seuilAlerteJours.toIntOrNull(),
                     seuilAlerteUnites = etat.seuilAlerteUnites.toIntOrNull(),
                     critique = etat.critique,
+                    archiveLe = etat.archiveLe,
                 ),
                 type = etat.type,
                 rythme = etat.rythme,
                 dateDebut = etat.dateDebut,
                 dateFin = etat.dateFin,
                 doses = etat.doses.map { (moment, dose) -> DosePrescrite(moment, dose) },
+                // Une creation n'a pas de passe a proteger : elle prend effet a la
+                // date de debut saisie, meme passee, sous peine de perdre l'ancrage
+                // du rythme (le champ « S'applique a partir du » n'est d'ailleurs
+                // pas affiche a la creation, voir EditionEcran). Une modification
+                // utilise la date d'effet saisie par l'utilisateur.
+                dateEffet = dateEffet,
             )
             _etat.update { it.copy(erreur = null, enregistre = true) }
         } catch (erreur: IllegalArgumentException) {
@@ -163,9 +263,11 @@ class EditionViewModel @Inject constructor(
         }
     }
 
-    fun supprimer() = viewModelScope.launch {
+    fun archiver() = viewModelScope.launch {
         val id = _etat.value.id
-        if (id != 0L) supprimerMedicament(id)
+        if (id != 0L) archiverMedicament(id)
         _etat.update { it.copy(enregistre = true) }
     }
 }
+
+private fun intervalleValide(n: Int): Boolean = n >= 2

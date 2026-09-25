@@ -15,6 +15,6 @@ class MedicamentsViewModel @Inject constructor(
     depot: DepotMedicaments,
 ) : ViewModel() {
 
-    val medicaments: StateFlow<List<Medicament>> = depot.observerTous()
+    val medicaments: StateFlow<List<Medicament>> = depot.observerActifs()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 }

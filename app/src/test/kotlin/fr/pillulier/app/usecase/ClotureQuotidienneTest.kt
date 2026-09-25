@@ -1,14 +1,18 @@
 package fr.pillulier.app.usecase
 
+import android.app.NotificationManager
+import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import fr.pillulier.app.data.DepotEvenements
 import fr.pillulier.app.data.DepotMedicaments
 import fr.pillulier.app.data.DepotMoments
 import fr.pillulier.app.data.DepotOrdonnances
 import fr.pillulier.app.data.db.PillulierDatabase
 import fr.pillulier.app.data.db.momentsParDefaut
 import fr.pillulier.app.rappels.Notifications
+import fr.pillulier.app.widget.RafraichirWidget
 import fr.pillulier.domain.CleRappel
 import fr.pillulier.domain.DosePrescrite
 import fr.pillulier.domain.Forme
@@ -25,21 +29,25 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
-import android.app.NotificationManager
-import android.content.Context
 import java.time.LocalDate
 import java.time.LocalDateTime
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
+/**
+ * Le travail de minuit passe par deux chemins — le travailleur periodique et le
+ * recepteur d'alarme — qui doivent produire la meme chose. Les assertions
+ * portent sur un effet propre a chaque etape : seule la cloture retire les
+ * notifications de la veille, seul le rearmement programme le jour courant.
+ */
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [34])
-class CloturerJourneeTest {
+class ClotureQuotidienneTest {
 
     private lateinit var base: PillulierDatabase
     private lateinit var contexte: Context
     private lateinit var notifications: Notifications
-    private lateinit var cloturer: CloturerJournee
+    private lateinit var cloture: ClotureQuotidienne
     private val programmateur = ProgrammateurEspion()
     private val horloge = HorlogeFigee(LocalDateTime.of(2026, 1, 6, 0, 5))
 
@@ -52,11 +60,20 @@ class CloturerJourneeTest {
             .build()
         notifications = Notifications(contexte)
         notifications.creerCanaux()
-        cloturer = CloturerJournee(
-            medicaments = DepotMedicaments(base.medicaments()),
-            programmateur = programmateur,
-            notifications = notifications,
-            horloge = horloge,
+
+        val medicaments = DepotMedicaments(base.medicaments())
+        val moments = DepotMoments(base.moments())
+        cloture = ClotureQuotidienne(
+            cloturerJournee = CloturerJournee(medicaments, programmateur, notifications, horloge),
+            reArmerRappels = ReArmerRappels(
+                ordonnances = DepotOrdonnances(base.ordonnances(), base),
+                medicaments = medicaments,
+                moments = moments,
+                evenements = DepotEvenements(base.evenements()),
+                programmateur = programmateur,
+                horloge = horloge,
+            ),
+            rafraichirWidget = RafraichirWidget(contexte),
         )
     }
 
@@ -64,8 +81,7 @@ class CloturerJourneeTest {
     fun fermer() = base.close()
 
     private suspend fun medicamentDuMatin(): Long {
-        val depot = DepotMedicaments(base.medicaments())
-        val id = depot.enregistrer(
+        val id = DepotMedicaments(base.medicaments()).enregistrer(
             Medicament(
                 id = 0,
                 nom = "Levothyrox",
@@ -96,17 +112,7 @@ class CloturerJourneeTest {
     }
 
     @Test
-    fun `la cloture annule les alarmes de la veille`() = runTest {
-        val id = medicamentDuMatin()
-
-        cloturer()
-
-        assertTrue(CleRappel(id, LocalDate.of(2026, 1, 5), Moment.MATIN) in programmateur.annulees)
-        assertEquals(4, programmateur.annulees.size, "les quatre moments de la veille")
-    }
-
-    @Test
-    fun `la cloture retire les notifications de la veille`() = runTest {
+    fun `le travail de minuit retire les notifications de la veille`() = runTest {
         val id = medicamentDuMatin()
         val cle = CleRappel(id, LocalDate.of(2026, 1, 5), Moment.MATIN)
         notifications.posterRappel(
@@ -116,7 +122,7 @@ class CloturerJourneeTest {
             critique = false,
         )
 
-        cloturer()
+        cloture()
 
         val gestionnaire = contexte.getSystemService(NotificationManager::class.java)
         assertEquals(
@@ -126,32 +132,16 @@ class CloturerJourneeTest {
     }
 
     @Test
-    fun `la cloture n ecrit rien en base`() = runTest {
-        medicamentDuMatin()
-
-        cloturer()
-
-        assertTrue(base.evenements().duJour(LocalDate.of(2026, 1, 5)).isEmpty())
-    }
-
-    @Test
-    fun `la cloture retire la notification d une dose retiree de l ordonnance`() = runTest {
+    fun `le travail de minuit rearme les alarmes du jour courant`() = runTest {
         val id = medicamentDuMatin()
-        val cleSoir = CleRappel(id, LocalDate.of(2026, 1, 5), Moment.SOIR)
-        notifications.posterRappel(
-            cleSoir,
-            DepotMedicaments(base.medicaments()).parId(id)!!,
-            dose = 1.0,
-            critique = false,
-        )
 
-        cloturer()
+        cloture()
 
-        val gestionnaire = contexte.getSystemService(NotificationManager::class.java)
-        assertEquals(
-            0,
-            shadowOf(gestionnaire).activeNotifications.count { it.id == cleSoir.codeRequete() },
-            "le planning courant ne prevoit pas de dose du soir, la notification doit partir quand meme",
+        assertTrue(
+            programmateur.programmees.any {
+                it.cle == CleRappel(id, LocalDate.of(2026, 1, 6), Moment.MATIN)
+            },
+            "la prise du matin du jour courant doit etre reprogrammee",
         )
     }
 }

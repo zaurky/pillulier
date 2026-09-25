@@ -5,12 +5,14 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
@@ -28,6 +30,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -57,30 +60,59 @@ fun EditionEcran(
     LaunchedEffect(medicamentId) { vue.charger(medicamentId) }
     LaunchedEffect(etat.enregistre) { if (etat.enregistre) surSortie() }
 
-    // La clé étrangère de `evenement_prise` est en cascade : supprimer efface
-    // aussi tout le journal des prises du médicament, sans retour possible.
+    // Un médicament ne se supprime pas : il s'archive. Son historique de
+    // prises reste lisible, seul son planning à venir s'arrête.
     if (confirmationSuppression) {
         AlertDialog(
             onDismissRequest = { confirmationSuppression = false },
-            title = { Text("Supprimer ce médicament ?") },
+            title = { Text("Archiver ce médicament ?") },
             text = {
                 Text(
-                    "« ${etat.nom} » et l'historique de toutes ses prises seront " +
-                        "définitivement effacés. Cette action est irréversible.",
+                    "« ${etat.nom} » sera archivé : il disparaîtra de la liste et des " +
+                        "prochains jours. Ses prises déjà enregistrées restent dans l'historique.",
                 )
             },
             confirmButton = {
                 TextButton(
                     onClick = {
                         confirmationSuppression = false
-                        vue.supprimer()
+                        vue.archiver()
                     },
                 ) {
-                    Text("Supprimer")
+                    Text("Archiver")
                 }
             },
             dismissButton = {
                 TextButton(onClick = { confirmationSuppression = false }) { Text("Annuler") }
+            },
+        )
+    }
+
+    // Dater un effet avant la plus ancienne prescription efface toutes les
+    // versions d'un coup. Le geste est legitime — la spec autorise la
+    // correction retroactive — mais une annee mal tapee dans le selecteur en
+    // est indiscernable, alors on montre ce qui disparaitrait.
+    etat.versionsAEffacer?.let { combien ->
+        AlertDialog(
+            onDismissRequest = vue::renoncerEffacement,
+            title = { Text("Remonter avant le début du traitement ?") },
+            text = {
+                Text(
+                    "Cette date d'effet est antérieure à la plus ancienne ordonnance " +
+                        "enregistrée. " +
+                        if (combien == 1) {
+                            "La prescription actuelle sera remplacée par celle-ci."
+                        } else {
+                            "Les $combien versions de prescription seront remplacées par celle-ci."
+                        } +
+                        " Vos prises déjà enregistrées ne sont pas touchées.",
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { vue.confirmerEffacement() }) { Text("Remplacer") }
+            },
+            dismissButton = {
+                TextButton(onClick = vue::renoncerEffacement) { Text("Annuler") }
             },
         )
     }
@@ -153,8 +185,20 @@ fun EditionEcran(
                 )
                 FilterChip(
                     selected = etat.rythme is Rythme.UnJourSurN,
-                    onClick = { vue.choisirUnJourSurN(2) },
-                    label = { Text("Un jour sur deux") },
+                    onClick = { vue.choisirUnJourSurN() },
+                    label = { Text("Un jour sur…") },
+                )
+            }
+
+            if (etat.rythme is Rythme.UnJourSurN) {
+                OutlinedTextField(
+                    value = etat.intervalleJours,
+                    onValueChange = vue::modifierIntervalle,
+                    label = { Text("Un jour sur") },
+                    suffix = { Text("jours") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.width(180.dp),
                 )
             }
 
@@ -169,17 +213,34 @@ fun EditionEcran(
                 }
             }
 
-            SelecteurDate(
-                libelle = "Début du traitement",
-                date = etat.dateDebut,
-                surChangement = vue::modifierDateDebut,
-            )
+            // Reserve a la creation : c'est la qu'elle fixe le debut du traitement
+            // et l'ancrage du rythme. Sur une modification, enregistrerVersion
+            // ecrase dateDebut par la date d'effet — le champ acceptait donc une
+            // saisie qu'il jetait en silence. « S'applique a partir du » est le
+            // seul controle de date qui agit alors.
+            if (etat.id == 0L) {
+                SelecteurDate(
+                    libelle = "Début du traitement",
+                    date = etat.dateDebut,
+                    surChangement = vue::modifierDateDebut,
+                )
+            }
             SelecteurDateOptionnelle(
                 libelle = "Fin du traitement",
                 date = etat.dateFin,
                 dateDebut = etat.dateDebut,
                 surChangement = vue::modifierDateFin,
             )
+
+            // Visible en modification seulement : a la creation, « Début du
+            // traitement » joue deja ce role et un second champ egarerait.
+            if (etat.id != 0L) {
+                SelecteurDate(
+                    libelle = "S'applique à partir du",
+                    date = etat.dateEffet,
+                    surChangement = vue::modifierDateEffet,
+                )
+            }
 
             Text("Doses par moment", style = MaterialTheme.typography.titleSmall)
             Moment.entries.forEach { moment ->
@@ -216,7 +277,7 @@ fun EditionEcran(
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(onClick = { vue.enregistrer() }) { Text("Enregistrer") }
             if (etat.id != 0L) {
-                OutlinedButton(onClick = { confirmationSuppression = true }) { Text("Supprimer") }
+                OutlinedButton(onClick = { confirmationSuppression = true }) { Text("Archiver") }
             }
         }
     }

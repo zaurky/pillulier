@@ -21,7 +21,7 @@ sealed interface Rythme {
 
     data class JoursDeSemaine(val jours: Set<DayOfWeek>) : Rythme
 
-    /** Un jour sur [n], compté depuis la date de début de l'ordonnance. */
+    /** Un jour sur [n], compté depuis la date d'ancrage de l'ordonnance. */
     data class UnJourSurN(val n: Int) : Rythme {
         init {
             require(n >= 2) { "un jour sur N exige n >= 2, reçu $n" }
@@ -42,6 +42,8 @@ data class Medicament(
     val seuilAlerteUnites: Int?,
     /** Déclenche l'alarme plein écran au lieu d'une notification classique. */
     val critique: Boolean,
+    /** Non nulle = retiré de la liste et du planning, mais son historique demeure. */
+    val archiveLe: Instant? = null,
 )
 
 data class DosePrescrite(val moment: Moment, val dose: Double)
@@ -54,6 +56,12 @@ data class Ordonnance(
     val dateDebut: LocalDate,
     /** Nulle = traitement au long cours. */
     val dateFin: LocalDate?,
+    /**
+     * Origine du rythme, distincte de [dateDebut] qui borne cette version.
+     * Les versions successives d'une meme prescription la partagent, sans quoi
+     * scinder une ordonnance « un jour sur N » decalerait sa phase.
+     */
+    val dateAncrage: LocalDate,
 )
 
 data class OrdonnanceAvecDoses(

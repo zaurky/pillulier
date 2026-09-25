@@ -47,6 +47,7 @@ fun MedicamentEntity.versDomaine() = Medicament(
     seuilAlerteJours = seuilAlerteJours,
     seuilAlerteUnites = seuilAlerteUnites,
     critique = critique,
+    archiveLe = archiveLe,
 )
 
 fun Medicament.versEntite() = MedicamentEntity(
@@ -59,6 +60,7 @@ fun Medicament.versEntite() = MedicamentEntity(
     seuilAlerteJours = seuilAlerteJours,
     seuilAlerteUnites = seuilAlerteUnites,
     critique = critique,
+    archiveLe = archiveLe,
 )
 
 fun OrdonnanceAvecDosesEntity.versDomaine() = OrdonnanceAvecDoses(
@@ -69,6 +71,7 @@ fun OrdonnanceAvecDosesEntity.versDomaine() = OrdonnanceAvecDoses(
         rythme = rythmeDepuisColonnes(ordonnance.rythmeType, ordonnance.rythmeJours, ordonnance.rythmeN),
         dateDebut = ordonnance.dateDebut,
         dateFin = ordonnance.dateFin,
+        dateAncrage = ordonnance.dateAncrage,
     ),
     doses = doses.map { DosePrescrite(it.moment, it.dose) },
 )
@@ -84,6 +87,7 @@ fun Ordonnance.versEntite(): OrdonnanceEntity {
         rythmeN = n,
         dateDebut = dateDebut,
         dateFin = dateFin,
+        dateAncrage = dateAncrage,
     )
 }
 

@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -26,7 +28,10 @@ fun PreferencesEcran(vue: PreferencesViewModel = hiltViewModel()) {
     val etat by vue.etat.collectAsStateWithLifecycle()
 
     Column(
-        modifier = Modifier.fillMaxWidth().padding(16.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .verticalScroll(rememberScrollState())
+            .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text("Heures des moments", style = MaterialTheme.typography.titleMedium)
@@ -34,20 +39,14 @@ fun PreferencesEcran(vue: PreferencesViewModel = hiltViewModel()) {
         Moment.entries.forEach { moment ->
             val heure = etat.heures[moment] ?: return@forEach
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Text(libelleMoment(moment), modifier = Modifier.padding(end = 8.dp))
-                OutlinedButton(onClick = { vue.definirHeure(moment, heure.minusMinutes(15)) }) {
-                    Text("−15 min")
-                }
-                Text(heure.format(formatHeure), style = MaterialTheme.typography.bodyLarge)
-                OutlinedButton(onClick = { vue.definirHeure(moment, heure.plusMinutes(15)) }) {
-                    Text("+15 min")
-                }
-            }
+            ReglageStepper(
+                libelle = libelleMoment(moment),
+                valeur = heure.format(formatHeure),
+                libelleMoins = "−15 min",
+                libellePlus = "+15 min",
+                surMoins = { vue.definirHeure(moment, heure.minusMinutes(15)) },
+                surPlus = { vue.definirHeure(moment, heure.plusMinutes(15)) },
+            )
         }
 
         Text("Rappels", style = MaterialTheme.typography.titleMedium)
@@ -65,33 +64,58 @@ fun PreferencesEcran(vue: PreferencesViewModel = hiltViewModel()) {
 
         Text("Renouvellement", style = MaterialTheme.typography.titleMedium)
 
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Text("Alerter par défaut")
-            OutlinedButton(
-                onClick = { vue.definirSeuilJours((etat.valeurs.seuilAlerteJoursDefaut - 1).coerceAtLeast(1)) },
-            ) {
-                Text("−")
-            }
-            Text("${etat.valeurs.seuilAlerteJoursDefaut} jours avant la fin")
-            OutlinedButton(onClick = { vue.definirSeuilJours(etat.valeurs.seuilAlerteJoursDefaut + 1) }) {
-                Text("+")
-            }
-        }
+        ReglageStepper(
+            libelle = "Alerter par défaut",
+            valeur = "${etat.valeurs.seuilAlerteJoursDefaut} jours avant la fin",
+            libelleMoins = "−",
+            libellePlus = "+",
+            surMoins = { vue.definirSeuilJours(etat.valeurs.seuilAlerteJoursDefaut - 1) },
+            surPlus = { vue.definirSeuilJours(etat.valeurs.seuilAlerteJoursDefaut + 1) },
+        )
     }
 }
 
 @Composable
 private fun ReglageMinutes(libelle: String, valeur: Int, surChangement: (Int) -> Unit) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Text(libelle)
-        OutlinedButton(onClick = { surChangement((valeur - 5).coerceAtLeast(5)) }) { Text("−5") }
-        Text("$valeur min")
-        OutlinedButton(onClick = { surChangement(valeur + 5) }) { Text("+5") }
+    ReglageStepper(
+        libelle = libelle,
+        valeur = "$valeur min",
+        libelleMoins = "−5",
+        libellePlus = "+5",
+        surMoins = { surChangement(valeur - 5) },
+        surPlus = { surChangement(valeur + 5) },
+    )
+}
+
+/**
+ * Le libelle prend sa propre ligne : mis a cote du stepper, les plus longs
+ * — « Délai du « Plus tard » », « 3 jours avant la fin » — debordaient et se
+ * faisaient tronquer. Le ViewModel borne les valeurs, l'ecran ne fait plus
+ * que compter.
+ */
+@Composable
+private fun ReglageStepper(
+    libelle: String,
+    valeur: String,
+    libelleMoins: String,
+    libellePlus: String,
+    surMoins: () -> Unit,
+    surPlus: () -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(libelle, style = MaterialTheme.typography.bodyMedium)
+
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            OutlinedButton(onClick = surMoins) { Text(libelleMoins) }
+            Text(
+                valeur,
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier.padding(horizontal = 4.dp),
+            )
+            OutlinedButton(onClick = surPlus) { Text(libellePlus) }
+        }
     }
 }

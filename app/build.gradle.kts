@@ -48,7 +48,13 @@ kotlin {
 }
 
 ksp {
-    arg("room.schemaLocation", "$projectDir/schemas")
+    // Les schemas vivent dans les assets de la variante main, et non dans
+    // $projectDir/schemas : AGP 8.12.0 fait pointer `android_merged_assets` des
+    // tests unitaires sur les assets fusionnes de main, et ne fusionne jamais
+    // ceux du source set `test`. C'est le seul emplacement ou
+    // MigrationTestHelper les trouve en JVM. Ils pesent une vingtaine de Ko
+    // dans l'APK, prix accepte pour une migration testee.
+    arg("room.schemaLocation", "$projectDir/src/main/assets")
 }
 
 dependencies {

@@ -6,24 +6,23 @@ import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
-import fr.pillulier.app.usecase.CloturerJournee
-import fr.pillulier.app.usecase.ReArmerRappels
-import fr.pillulier.app.widget.RafraichirWidget
+import fr.pillulier.app.usecase.ClotureQuotidienne
 
-/** Clôture la veille puis réarme la fenêtre de trois jours. */
+/**
+ * Filet du travail de minuit. WorkManager peut differer ce travail de plusieurs
+ * heures en Doze — la ponctualite revient a l'alarme exacte de
+ * [PlanificateurQuotidien] ; celui-ci garantit seulement qu'il finira par
+ * passer si cette alarme se perd.
+ */
 @HiltWorker
 class TravailQuotidien @AssistedInject constructor(
     @Assisted contexte: Context,
     @Assisted parametres: WorkerParameters,
-    private val cloturerJournee: CloturerJournee,
-    private val reArmerRappels: ReArmerRappels,
-    private val rafraichirWidget: RafraichirWidget,
+    private val clotureQuotidienne: ClotureQuotidienne,
 ) : CoroutineWorker(contexte, parametres) {
 
     override suspend fun doWork(): Result {
-        cloturerJournee()
-        reArmerRappels()
-        rafraichirWidget()
+        clotureQuotidienne()
         return Result.success()
     }
 

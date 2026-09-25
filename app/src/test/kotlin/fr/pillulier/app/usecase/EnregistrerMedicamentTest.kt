@@ -28,7 +28,7 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
-import kotlin.test.assertNull
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 @RunWith(AndroidJUnit4::class)
@@ -39,7 +39,7 @@ class EnregistrerMedicamentTest {
     private lateinit var medicaments: DepotMedicaments
     private lateinit var ordonnances: DepotOrdonnances
     private lateinit var enregistrer: EnregistrerMedicament
-    private lateinit var supprimer: SupprimerMedicament
+    private lateinit var archiver: ArchiverMedicament
     private val programmateur = ProgrammateurEspion()
     private val horloge = HorlogeFigee(LocalDateTime.of(2026, 1, 5, 7, 0))
 
@@ -51,7 +51,7 @@ class EnregistrerMedicamentTest {
         ).addCallback(momentsParDefaut).allowMainThreadQueries().build()
 
         medicaments = DepotMedicaments(base.medicaments())
-        ordonnances = DepotOrdonnances(base.ordonnances())
+        ordonnances = DepotOrdonnances(base.ordonnances(), base)
         val reArmer = ReArmerRappels(
             ordonnances = ordonnances,
             medicaments = medicaments,
@@ -62,8 +62,9 @@ class EnregistrerMedicamentTest {
         )
         val rafraichirWidget = RafraichirWidget(ApplicationProvider.getApplicationContext())
         enregistrer = EnregistrerMedicament(medicaments, ordonnances, reArmer, rafraichirWidget)
-        supprimer = SupprimerMedicament(
+        archiver = ArchiverMedicament(
             medicaments = medicaments,
+            ordonnances = ordonnances,
             programmateur = programmateur,
             notifications = Notifications(ApplicationProvider.getApplicationContext()),
             reArmerRappels = reArmer,
@@ -96,10 +97,11 @@ class EnregistrerMedicamentTest {
             dateDebut = LocalDate.of(2026, 1, 1),
             dateFin = null,
             doses = listOf(DosePrescrite(Moment.MATIN, 1.0)),
+            dateEffet = LocalDate.of(2026, 1, 1),
         )
 
         assertEquals("Levothyrox", medicaments.parId(id)!!.nom)
-        assertEquals(1, ordonnances.pourMedicament(id)!!.doses.size)
+        assertEquals(1, ordonnances.versionsDe(id).single().doses.size)
     }
 
     @Test
@@ -111,6 +113,7 @@ class EnregistrerMedicamentTest {
             dateDebut = LocalDate.of(2026, 1, 1),
             dateFin = null,
             doses = listOf(DosePrescrite(Moment.MATIN, 1.0)),
+            dateEffet = LocalDate.of(2026, 1, 1),
         )
 
         assertEquals(3, programmateur.programmees.size)
@@ -126,6 +129,7 @@ class EnregistrerMedicamentTest {
                 dateDebut = LocalDate.of(2026, 1, 1),
                 dateFin = null,
                 doses = emptyList(),
+                dateEffet = LocalDate.of(2026, 1, 1),
             )
         }
     }
@@ -140,6 +144,7 @@ class EnregistrerMedicamentTest {
                 dateDebut = LocalDate.of(2026, 1, 1),
                 dateFin = null,
                 doses = listOf(DosePrescrite(Moment.MATIN, 1.0)),
+                dateEffet = LocalDate.of(2026, 1, 1),
             )
         }
     }
@@ -154,6 +159,7 @@ class EnregistrerMedicamentTest {
                 dateDebut = LocalDate.of(2026, 1, 10),
                 dateFin = LocalDate.of(2026, 1, 5),
                 doses = listOf(DosePrescrite(Moment.MATIN, 1.0)),
+                dateEffet = LocalDate.of(2026, 1, 10),
             )
         }
     }
@@ -167,9 +173,10 @@ class EnregistrerMedicamentTest {
             dateDebut = LocalDate.of(2026, 1, 1),
             dateFin = null,
             doses = emptyList(),
+            dateEffet = LocalDate.of(2026, 1, 1),
         )
 
-        assertTrue(ordonnances.pourMedicament(id)!!.doses.isEmpty())
+        assertTrue(ordonnances.versionsDe(id).single().doses.isEmpty())
     }
 
     @Test
@@ -181,6 +188,7 @@ class EnregistrerMedicamentTest {
             dateDebut = LocalDate.of(2026, 1, 1),
             dateFin = null,
             doses = listOf(DosePrescrite(Moment.MATIN, 1.0)),
+            dateEffet = LocalDate.of(2026, 1, 1),
         )
 
         enregistrer(
@@ -190,15 +198,16 @@ class EnregistrerMedicamentTest {
             dateDebut = LocalDate.of(2026, 1, 1),
             dateFin = null,
             doses = listOf(DosePrescrite(Moment.SOIR, 2.0)),
+            dateEffet = LocalDate.of(2026, 1, 1),
         )
 
         assertEquals(1, medicaments.tous().size)
         assertEquals("100 µg", medicaments.parId(id)!!.dosage)
-        assertEquals(listOf(Moment.SOIR), ordonnances.pourMedicament(id)!!.doses.map { it.moment })
+        assertEquals(listOf(Moment.SOIR), ordonnances.versionsDe(id).single().doses.map { it.moment })
     }
 
     @Test
-    fun `supprimer un medicament supprime son ordonnance`() = runTest {
+    fun `archiver un medicament clot son ordonnance et le marque archive`() = runTest {
         val id = enregistrer(
             medicament = levothyrox(),
             type = TypeOrdonnance.PLANIFIEE,
@@ -206,16 +215,21 @@ class EnregistrerMedicamentTest {
             dateDebut = LocalDate.of(2026, 1, 1),
             dateFin = null,
             doses = listOf(DosePrescrite(Moment.MATIN, 1.0)),
+            dateEffet = LocalDate.of(2026, 1, 1),
         )
 
-        supprimer(id)
+        archiver(id)
 
-        assertNull(medicaments.parId(id))
-        assertNull(ordonnances.pourMedicament(id))
+        assertNotNull(medicaments.parId(id)!!.archiveLe, "le medicament reste connu, marque archive")
+        assertEquals(
+            LocalDate.of(2026, 1, 5),
+            ordonnances.versionsDe(id).single().ordonnance.dateFin,
+            "l ordonnance est cloturee ce soir, pas effacee",
+        )
     }
 
     @Test
-    fun `supprimer annule les alarmes du medicament avant de l effacer`() = runTest {
+    fun `archiver annule les alarmes du medicament avant de l archiver`() = runTest {
         val id = enregistrer(
             medicament = levothyrox(),
             type = TypeOrdonnance.PLANIFIEE,
@@ -223,21 +237,110 @@ class EnregistrerMedicamentTest {
             dateDebut = LocalDate.of(2026, 1, 1),
             dateFin = null,
             doses = listOf(DosePrescrite(Moment.MATIN, 1.0)),
+            dateEffet = LocalDate.of(2026, 1, 1),
         )
         programmateur.annulees.clear()
 
-        supprimer(id)
+        archiver(id)
 
-        // La veille plus la fenêtre, les quatre moments : le réarmement qui suit
-        // ne verrait plus cet identifiant dans `medicaments.tous()`.
-        val attendues = (-1L until ReArmerRappels.JOURS_FENETRE).flatMap { decalage ->
+        // Le rearmement qui suit annule lui aussi un surensemble sur
+        // (-1L until JOURS_FENETRE) pour tout medicament connu, l archive
+        // compris : un simple containsAll serait vrai quelles que soient les
+        // bornes de la boucle d archivage, puisque son intervalle (demain et
+        // apres-demain) est deja inclus dans celui du rearmement. On verifie
+        // donc le prefixe exact, dans l ordre d appel, pour isoler ce que la
+        // boucle d archivage annule elle-meme avant de rearmer.
+        val attendues = (1L until ReArmerRappels.JOURS_FENETRE).flatMap { decalage ->
             Moment.entries.map { moment ->
                 CleRappel(id, LocalDate.of(2026, 1, 5).plusDays(decalage), moment)
             }
         }
-        assertTrue(
-            programmateur.annulees.containsAll(attendues),
-            "les alarmes du medicament supprime doivent etre annulees",
+        assertEquals(
+            attendues,
+            programmateur.annulees.take(attendues.size),
+            "la boucle d archivage doit annuler exactement demain et apres-demain, avant le rearmement",
         )
+    }
+
+    private suspend fun medicamentQuotidien(): Long {
+        enregistrer(
+            medicament = Medicament(
+                id = 0,
+                nom = "Levothyrox",
+                dosage = "75 µg",
+                forme = Forme.COMPRIME,
+                unitesParBoite = 30,
+                stockUnites = 30.0,
+                seuilAlerteJours = 7,
+                seuilAlerteUnites = null,
+                critique = false,
+            ),
+            type = TypeOrdonnance.PLANIFIEE,
+            rythme = Rythme.TousLesJours,
+            dateDebut = LocalDate.of(2026, 1, 1),
+            dateFin = null,
+            doses = listOf(DosePrescrite(Moment.MATIN, 1.0)),
+            dateEffet = LocalDate.of(2026, 1, 1),
+        )
+        return medicaments.tous().single().id
+    }
+
+    @Test
+    fun `renommer un medicament ne cree pas de version`() = runTest {
+        val id = medicamentQuotidien()
+        val avant = ordonnances.versionsDe(id).size
+
+        enregistrer(
+            medicament = medicaments.parId(id)!!.copy(nom = "Levothyrox 100"),
+            type = TypeOrdonnance.PLANIFIEE,
+            rythme = Rythme.TousLesJours,
+            dateDebut = LocalDate.of(2026, 1, 1),
+            dateFin = null,
+            doses = listOf(DosePrescrite(Moment.MATIN, 1.0)),
+            dateEffet = LocalDate.of(2026, 1, 10),
+        )
+
+        assertEquals(avant, ordonnances.versionsDe(id).size)
+        assertEquals("Levothyrox 100", medicaments.parId(id)!!.nom)
+    }
+
+    @Test
+    fun `une seconde modification a la meme date remplace la premiere`() = runTest {
+        val id = medicamentQuotidien()
+
+        repeat(2) { tour ->
+            enregistrer(
+                medicament = medicaments.parId(id)!!,
+                type = TypeOrdonnance.PLANIFIEE,
+                rythme = Rythme.UnJourSurN(tour + 2),
+                dateDebut = LocalDate.of(2026, 1, 1),
+                dateFin = null,
+                doses = listOf(DosePrescrite(Moment.MATIN, 1.0)),
+                dateEffet = LocalDate.of(2026, 1, 10),
+            )
+        }
+
+        val versions = ordonnances.versionsDe(id)
+        assertEquals(2, versions.size, "l originale cloturee, plus une seule nouvelle")
+        assertEquals(Rythme.UnJourSurN(3), versions.last().ordonnance.rythme)
+    }
+
+    @Test
+    fun `la version precedente est cloturee la veille de la date d effet`() = runTest {
+        val id = medicamentQuotidien()
+
+        enregistrer(
+            medicament = medicaments.parId(id)!!,
+            type = TypeOrdonnance.PLANIFIEE,
+            rythme = Rythme.UnJourSurN(2),
+            dateDebut = LocalDate.of(2026, 1, 1),
+            dateFin = null,
+            doses = listOf(DosePrescrite(Moment.MATIN, 1.0)),
+            dateEffet = LocalDate.of(2026, 1, 10),
+        )
+
+        val versions = ordonnances.versionsDe(id).sortedBy { it.ordonnance.dateDebut }
+        assertEquals(LocalDate.of(2026, 1, 9), versions.first().ordonnance.dateFin)
+        assertEquals(LocalDate.of(2026, 1, 10), versions.last().ordonnance.dateDebut)
     }
 }
