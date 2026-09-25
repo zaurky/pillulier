@@ -9,6 +9,10 @@ import fr.pillulier.app.data.db.momentsParDefaut
 import fr.pillulier.app.temps.Horloge
 import fr.pillulier.domain.Forme
 import fr.pillulier.domain.Moment
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Before
@@ -22,11 +26,18 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-class HorlogeFigee(private var valeur: LocalDateTime) : Horloge {
+class HorlogeFigee(valeur: LocalDateTime) : Horloge {
+    private val etat = MutableStateFlow(valeur)
+    private val valeur: LocalDateTime get() = etat.value
+
     override fun maintenant(): LocalDateTime = valeur
     override fun aujourdhui(): LocalDate = valeur.toLocalDate()
     override fun instant(): Instant = valeur.toInstant(java.time.ZoneOffset.UTC)
-    fun avancerA(nouvelle: LocalDateTime) { valeur = nouvelle }
+
+    /** Avancer l horloge figee tient lieu de passage de minuit. */
+    override fun jours(): Flow<LocalDate> = etat.map { it.toLocalDate() }.distinctUntilChanged()
+
+    fun avancerA(nouvelle: LocalDateTime) { etat.value = nouvelle }
 }
 
 @RunWith(AndroidJUnit4::class)
