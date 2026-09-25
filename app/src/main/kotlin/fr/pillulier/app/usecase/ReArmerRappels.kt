@@ -4,6 +4,7 @@ import fr.pillulier.app.data.DepotEvenements
 import fr.pillulier.app.data.DepotMedicaments
 import fr.pillulier.app.data.DepotMoments
 import fr.pillulier.app.data.DepotOrdonnances
+import fr.pillulier.app.debug.JournalDebug // JOURNAL-DEBUG
 import fr.pillulier.app.rappels.ProgrammateurAlarmes
 import fr.pillulier.app.temps.Horloge
 import fr.pillulier.domain.CleRappel
@@ -47,6 +48,7 @@ class ReArmerRappels @Inject constructor(
             }
         }
 
+        JournalDebug.ecrire("REARME", "depuis $maintenant") // JOURNAL-DEBUG
         val dernierJour = aujourdhui.plusDays(JOURS_FENETRE - 1)
         val dejaPrises = evenements.entre(aujourdhui, dernierJour)
 
