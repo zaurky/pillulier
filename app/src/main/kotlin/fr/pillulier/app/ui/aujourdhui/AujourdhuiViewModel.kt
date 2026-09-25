@@ -3,6 +3,7 @@ package fr.pillulier.app.ui.aujourdhui
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import fr.pillulier.app.debug.JournalDebug // JOURNAL-DEBUG
 import fr.pillulier.app.data.DepotMedicaments
 import fr.pillulier.app.data.DepotOrdonnances
 import fr.pillulier.app.rappels.Notifications
@@ -23,6 +24,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -50,7 +52,10 @@ class AujourdhuiViewModel @Inject constructor(
     // La date se relit au fil de l'eau, elle ne se grave pas à la construction :
     // un ViewModel vit aussi longtemps que son activité, et l'app laissée
     // ouverte la nuit affichait encore la veille au matin.
-    val etat: StateFlow<EtatAujourdhui> = horloge.jours().flatMapLatest { aujourdhui ->
+    val etat: StateFlow<EtatAujourdhui> = horloge.jours()
+        // JOURNAL-DEBUG : la ligne qui dit si l'ecran a suivi minuit.
+        .onEach { JournalDebug.ecrire("ECRAN", "journee affichee = $it") }
+        .flatMapLatest { aujourdhui ->
         combine(
             observerJournee(aujourdhui),
             observerAlertes(),
@@ -80,6 +85,7 @@ class AujourdhuiViewModel @Inject constructor(
 
     fun cocher(ligne: LigneJournee) = viewModelScope.launch {
         val jour = horloge.aujourdhui()
+        JournalDebug.ecrire("COCHE", "ecran: ${ligne.nom} ${ligne.moment} le $jour") // JOURNAL-DEBUG
         enregistrerPrise(ligne.medicamentId, jour, ligne.moment, ligne.dose)
         // Le réarmement annule l'alarme mais pas la notification déjà postée :
         // celle d'une prise critique est `setOngoing`, donc impossible à

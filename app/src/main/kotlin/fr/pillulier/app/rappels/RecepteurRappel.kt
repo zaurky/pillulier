@@ -8,6 +8,7 @@ import dagger.hilt.android.AndroidEntryPoint
 import fr.pillulier.app.data.DepotMedicaments
 import fr.pillulier.app.data.DepotOrdonnances
 import fr.pillulier.app.data.DepotPreferences
+import fr.pillulier.app.debug.JournalDebug // JOURNAL-DEBUG
 import fr.pillulier.app.temps.Horloge
 import fr.pillulier.app.usecase.RappelEncoreDu
 import fr.pillulier.app.widget.RafraichirWidget
@@ -46,7 +47,12 @@ class RecepteurRappel : BroadcastReceiver() {
                 // la prise soit cochée : `annuler` n'a aucune prise sur un
                 // déclenchement en vol. C'est le journal qui tranche, jamais
                 // l'alarme.
-                if (!rappelEncoreDu(cle)) return@launch
+                if (!rappelEncoreDu(cle)) {
+                    // JOURNAL-DEBUG : une alarme en vol refusee ici, c'est
+                    // exactement le bug 2 attrape au vol.
+                    JournalDebug.ecrire("RAPPEL", "refuse $cle (deja pris ou jour passe)")
+                    return@launch
+                }
 
                 val medicament = medicaments.parId(cle.medicamentId) ?: return@launch
                 val dose = ordonnances.enVigueur(cle.medicamentId, cle.date)
@@ -55,6 +61,7 @@ class RecepteurRappel : BroadcastReceiver() {
                     ?.dose
                     ?: return@launch
 
+                JournalDebug.ecrire("RAPPEL", "notification postee ${medicament.nom} $cle") // JOURNAL-DEBUG
                 notifications.posterRappel(cle, medicament, dose, critique)
                 rafraichirWidget()
 
