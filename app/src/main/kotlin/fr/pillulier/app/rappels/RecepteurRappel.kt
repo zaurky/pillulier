@@ -9,6 +9,7 @@ import fr.pillulier.app.data.DepotMedicaments
 import fr.pillulier.app.data.DepotOrdonnances
 import fr.pillulier.app.data.DepotPreferences
 import fr.pillulier.app.temps.Horloge
+import fr.pillulier.app.usecase.RappelEncoreDu
 import fr.pillulier.app.widget.RafraichirWidget
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -31,6 +32,7 @@ class RecepteurRappel : BroadcastReceiver() {
     @Inject lateinit var notifications: Notifications
     @Inject lateinit var programmateur: ProgrammateurAlarmes
     @Inject lateinit var horloge: Horloge
+    @Inject lateinit var rappelEncoreDu: RappelEncoreDu
     @Inject lateinit var rafraichirWidget: RafraichirWidget
 
     override fun onReceive(context: Context, intent: Intent) {
@@ -40,11 +42,11 @@ class RecepteurRappel : BroadcastReceiver() {
 
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                // « Aucune relance ne survit au lendemain » est un invariant du
-                // rappel lui-même, pas une conséquence de la clôture de 00h05 :
-                // le travail périodique est reportable, et une chaîne d'hier
-                // relancerait sinon toutes les quinze minutes en pleine nuit.
-                if (cle.date != horloge.aujourdhui()) return@launch
+                // L'alarme qui nous réveille peut être partie juste avant que
+                // la prise soit cochée : `annuler` n'a aucune prise sur un
+                // déclenchement en vol. C'est le journal qui tranche, jamais
+                // l'alarme.
+                if (!rappelEncoreDu(cle)) return@launch
 
                 val medicament = medicaments.parId(cle.medicamentId) ?: return@launch
                 val dose = ordonnances.enVigueur(cle.medicamentId, cle.date)
