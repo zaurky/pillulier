@@ -31,12 +31,21 @@ import fr.pillulier.app.ui.preferences.PreferencesEcran
 import fr.pillulier.app.ui.semaine.SemaineEcran
 import fr.pillulier.app.ui.stock.StockEcran
 
-private data class Onglet(val route: String, val titre: String, val icone: ImageVector)
+/**
+ * [titre] s affiche dans la barre du haut, [libelle] sous l icone de l onglet ou
+ * la place manque : les deux ne portent pas la meme contrainte de largeur.
+ */
+private data class Onglet(
+    val route: String,
+    val titre: String,
+    val icone: ImageVector,
+    val libelle: String = titre,
+)
 
 private val onglets = listOf(
     Onglet("aujourdhui", "Aujourd'hui", Icons.Filled.Today),
     Onglet("semaine", "Semaine", Icons.Filled.CalendarMonth),
-    Onglet("medicaments", "Médicaments", Icons.Filled.Medication),
+    Onglet("medicaments", "Médicaments", Icons.Filled.Medication, libelle = "Traitement"),
     Onglet("stock", "Stock", Icons.Filled.Inventory),
 )
 
@@ -69,7 +78,7 @@ fun PillulierNavigation(controleur: NavHostController = rememberNavController())
                             }
                         },
                         icon = { Icon(onglet.icone, contentDescription = onglet.titre) },
-                        label = { Text(onglet.titre) },
+                        label = { Text(onglet.libelle, maxLines = 1) },
                     )
                 }
             }
