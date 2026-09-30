@@ -5,6 +5,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import fr.pillulier.app.debug.JournalDebug // JOURNAL-DEBUG
 import fr.pillulier.domain.CleRappel
 import fr.pillulier.domain.Moment
 import fr.pillulier.domain.codeRequete
@@ -25,6 +26,7 @@ class ProgrammateurAlarmesAndroid @Inject constructor(
     private val gestionnaire = contexte.getSystemService(AlarmManager::class.java)
 
     override fun programmer(cle: CleRappel, quand: LocalDateTime, critique: Boolean) {
+        JournalDebug.ecrire("ALARME", "posee $cle pour $quand critique=$critique") // JOURNAL-DEBUG
         val declenchement = quand.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
         val intention = creerIntentEnAttente(cle, critique)
 
@@ -53,6 +55,9 @@ class ProgrammateurAlarmesAndroid @Inject constructor(
         rechercherIntentEnAttente(cle)?.let {
             gestionnaire.cancel(it)
             it.cancel()
+            // JOURNAL-DEBUG : seules les annulations qui trouvent quelque chose
+            // sont tracees — `ReArmerRappels` en tente des dizaines a vide.
+            JournalDebug.ecrire("ALARME", "retiree $cle")
         }
     }
 

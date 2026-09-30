@@ -12,8 +12,16 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
+import android.content.Intent
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.TextAlign
+import kotlinx.coroutines.launch
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -71,6 +79,61 @@ fun PreferencesEcran(vue: PreferencesViewModel = hiltViewModel()) {
             libellePlus = "+",
             surMoins = { vue.definirSeuilJours(etat.valeurs.seuilAlerteJoursDefaut - 1) },
             surPlus = { vue.definirSeuilJours(etat.valeurs.seuilAlerteJoursDefaut + 1) },
+        )
+
+        SectionJournal(vue) // JOURNAL-DEBUG
+    }
+}
+
+/**
+ * TEMPORAIRE — JOURNAL-DEBUG : toute cette section part avec le journal de
+ * diagnostic, une fois les deux bugs confirmés corrigés sur l'appareil.
+ */
+@Composable
+private fun SectionJournal(vue: PreferencesViewModel) {
+    val journal by vue.journalAffiche.collectAsStateWithLifecycle()
+    val contexte = LocalContext.current
+    val portee = rememberCoroutineScope()
+
+    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+    Text("Diagnostic (temporaire)", style = MaterialTheme.typography.titleMedium)
+    Text(
+        "Journal des coches, alarmes et rappels. À retirer une fois les deux bugs confirmés corrigés.",
+        style = MaterialTheme.typography.bodySmall,
+    )
+
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedButton(
+            onClick = { if (journal == null) vue.afficherJournal() else vue.masquerJournal() },
+        ) {
+            Text(if (journal == null) "Afficher" else "Masquer")
+        }
+        OutlinedButton(
+            onClick = {
+                portee.launch {
+                    val envoi = Intent(Intent.ACTION_SEND).apply {
+                        type = "text/plain"
+                        putExtra(Intent.EXTRA_STREAM, vue.uriDePartage())
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+                    contexte.startActivity(Intent.createChooser(envoi, "Partager le journal"))
+                }
+            },
+        ) { Text("Partager") }
+        OutlinedButton(onClick = { vue.effacerJournal() }) { Text("Effacer") }
+    }
+
+    journal?.let { texte ->
+        // Les lignes sont longues et horodatées : elles ne doivent ni se
+        // replier ni se faire tronquer, sinon le journal devient illisible.
+        Text(
+            texte,
+            style = MaterialTheme.typography.bodySmall,
+            fontFamily = FontFamily.Monospace,
+            softWrap = false,
+            textAlign = TextAlign.Start,
+            modifier = Modifier.horizontalScroll(rememberScrollState()),
         )
     }
 }

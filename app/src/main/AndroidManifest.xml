@@ -54,6 +54,18 @@
             </intent-filter>
         </receiver>
 
+        <!-- TEMPORAIRE — JOURNAL-DEBUG : a retirer avec le journal de diagnostic.
+             Aucune permission : le fichier partage vit dans le cache de l'app. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fichiers"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/chemins_partage" />
+        </provider>
+
         <provider
             android:name="androidx.startup.InitializationProvider"
             android:authorities="${applicationId}.androidx-startup"

@@ -1,5 +1,6 @@
 package fr.pillulier.app.widget
 
+import fr.pillulier.app.debug.JournalDebug // JOURNAL-DEBUG
 import android.content.Context
 import android.util.Log
 import androidx.datastore.preferences.core.Preferences
@@ -131,6 +132,8 @@ class ActionCocher : ActionCallback {
                 return
             }
 
+            // JOURNAL-DEBUG
+            JournalDebug.ecrire("COCHE", "widget: ${prise.nom} $moment le $jour")
             acces.enregistrerPrise()(medicamentId, jour, moment, prise.dose)
             // Écrite tout de suite après l'enregistrement : sinon la ligne
             // disparaît puis revient barrée, et la fenêtre de dix secondes
@@ -182,6 +185,7 @@ class ActionAnnuler : ActionCallback {
                 return
             }
 
+            JournalDebug.ecrire("COCHE", "widget: annulation $medicamentId $moment le $date") // JOURNAL-DEBUG
             acces.annulerPrise()(medicamentId, date, moment)
             acces.reArmerRappels()()
             ecrireAnnulable(context, glanceId, annulable = null)

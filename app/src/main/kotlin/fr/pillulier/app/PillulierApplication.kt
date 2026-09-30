@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import dagger.hilt.android.HiltAndroidApp
+import fr.pillulier.app.debug.JournalDebug // JOURNAL-DEBUG
 import fr.pillulier.app.rappels.Notifications
 import fr.pillulier.app.rappels.PlanificateurQuotidien
 import fr.pillulier.app.usecase.ReArmerRappels
@@ -25,6 +26,7 @@ class PillulierApplication : Application(), Configuration.Provider {
 
     override fun onCreate() {
         super.onCreate()
+        JournalDebug.initialiser(this) // JOURNAL-DEBUG
         notifications.creerCanaux()
         planificateur.planifier()
 
