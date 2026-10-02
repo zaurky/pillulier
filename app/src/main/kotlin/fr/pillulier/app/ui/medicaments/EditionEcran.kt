@@ -124,40 +124,44 @@ fun EditionEcran(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        OutlinedTextField(
-            value = etat.nom,
-            onValueChange = vue::modifierNom,
-            label = { Text("Nom") },
-            modifier = Modifier.fillMaxWidth(),
-        )
-        OutlinedTextField(
-            value = etat.dosage,
-            onValueChange = vue::modifierDosage,
-            label = { Text("Dosage") },
-            modifier = Modifier.fillMaxWidth(),
-        )
+        // La fiche se saisit a la creation, puis se corrige depuis l'onglet
+        // Stock : en modification cet ecran n'edite que le traitement.
+        if (etat.id == 0L) {
+            OutlinedTextField(
+                value = etat.nom,
+                onValueChange = vue::modifierNom,
+                label = { Text("Nom") },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            OutlinedTextField(
+                value = etat.dosage,
+                onValueChange = vue::modifierDosage,
+                label = { Text("Dosage") },
+                modifier = Modifier.fillMaxWidth(),
+            )
 
-        Text("Forme", style = MaterialTheme.typography.titleSmall)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Forme.entries.forEach { forme ->
-                FilterChip(
-                    selected = etat.forme == forme,
-                    onClick = { vue.modifierForme(forme) },
-                    label = { Text(libelleForme(forme, 1.0)) },
-                )
+            Text("Forme", style = MaterialTheme.typography.titleSmall)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Forme.entries.forEach { forme ->
+                    FilterChip(
+                        selected = etat.forme == forme,
+                        onClick = { vue.modifierForme(forme) },
+                        label = { Text(libelleForme(forme, 1.0)) },
+                    )
+                }
             }
-        }
 
-        OutlinedTextField(
-            value = etat.unitesParBoite,
-            onValueChange = vue::modifierUnitesParBoite,
-            label = { Text("Unités par boîte") },
-        )
-        OutlinedTextField(
-            value = etat.stockUnites,
-            onValueChange = vue::modifierStock,
-            label = { Text("Stock actuel en unités") },
-        )
+            OutlinedTextField(
+                value = etat.unitesParBoite,
+                onValueChange = vue::modifierUnitesParBoite,
+                label = { Text("Unités par boîte") },
+            )
+            OutlinedTextField(
+                value = etat.stockUnites,
+                onValueChange = vue::modifierStock,
+                label = { Text("Stock actuel en unités") },
+            )
+        }
 
         Row(verticalAlignment = Alignment.CenterVertically) {
             Switch(checked = etat.critique, onCheckedChange = vue::modifierCritique)
@@ -259,12 +263,14 @@ fun EditionEcran(
                 }
             }
 
-            OutlinedTextField(
-                value = etat.seuilAlerteJours,
-                onValueChange = vue::modifierSeuilJours,
-                label = { Text("Alerter X jours avant la fin (vide = défaut)") },
-            )
-        } else {
+            if (etat.id == 0L) {
+                OutlinedTextField(
+                    value = etat.seuilAlerteJours,
+                    onValueChange = vue::modifierSeuilJours,
+                    label = { Text("Alerter X jours avant la fin (vide = défaut)") },
+                )
+            }
+        } else if (etat.id == 0L) {
             OutlinedTextField(
                 value = etat.seuilAlerteUnites,
                 onValueChange = vue::modifierSeuilUnites,

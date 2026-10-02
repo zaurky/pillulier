@@ -8,6 +8,8 @@ import fr.pillulier.app.data.DepotOrdonnances
 import fr.pillulier.app.temps.Horloge
 import fr.pillulier.app.usecase.ArchiverMedicament
 import fr.pillulier.app.usecase.EnregistrerMedicament
+import fr.pillulier.app.usecase.EnregistrerFicheMedicament
+import fr.pillulier.app.usecase.EnregistrerPrescription
 import fr.pillulier.domain.DosePrescrite
 import fr.pillulier.domain.Forme
 import fr.pillulier.domain.Medicament
@@ -62,6 +64,8 @@ class EditionViewModel @Inject constructor(
     private val medicaments: DepotMedicaments,
     private val ordonnances: DepotOrdonnances,
     private val enregistrerMedicament: EnregistrerMedicament,
+    private val enregistrerPrescription: EnregistrerPrescription,
+    private val enregistrerFicheMedicament: EnregistrerFicheMedicament,
     private val archiverMedicament: ArchiverMedicament,
     private val horloge: Horloge,
 ) : ViewModel() {
@@ -159,19 +163,19 @@ class EditionViewModel @Inject constructor(
     fun enregistrer() = viewModelScope.launch {
         val etat = _etat.value
 
-        val unitesParBoite = etat.unitesParBoite.toIntOrNull()
-        val stockUnites = etat.stockUnites.replace(',', '.').toDoubleOrNull()
-
         // Un champ numérique non vide qui ne se lit pas est une erreur de saisie,
         // pas un zéro : le domaine ne reçoit qu'un nombre et ne pourrait plus
-        // faire la différence.
-        if (etat.unitesParBoite.isNotBlank() && unitesParBoite == null) {
-            _etat.update { it.copy(erreur = "Unités par boîte : nombre illisible") }
-            return@launch
-        }
-        if (etat.stockUnites.isNotBlank() && stockUnites == null) {
-            _etat.update { it.copy(erreur = "Stock : nombre illisible") }
-            return@launch
+        // faire la différence. Seule la création les montre : en modification
+        // la fiche s'édite depuis l'onglet Stock, et ces champs ne sont pas écrits.
+        if (etat.id == 0L) {
+            if (etat.unitesParBoite.isNotBlank() && etat.unitesParBoite.toIntOrNull() == null) {
+                _etat.update { it.copy(erreur = "Unités par boîte : nombre illisible") }
+                return@launch
+            }
+            if (etat.stockUnites.isNotBlank() && etat.stockUnites.replace(',', '.').toDoubleOrNull() == null) {
+                _etat.update { it.copy(erreur = "Stock : nombre illisible") }
+                return@launch
+            }
         }
         if (etat.rythme is Rythme.UnJourSurN &&
             etat.intervalleJours.toIntOrNull()?.let(::intervalleValide) != true
@@ -228,38 +232,62 @@ class EditionViewModel @Inject constructor(
     )
 
     private suspend fun ecrire(etat: EtatEdition, dateEffet: LocalDate) {
-        val unitesParBoite = etat.unitesParBoite.toIntOrNull()
-        val stockUnites = etat.stockUnites.replace(',', '.').toDoubleOrNull()
-
         try {
-            enregistrerMedicament(
-                medicament = Medicament(
-                    id = etat.id,
-                    nom = etat.nom.trim(),
-                    dosage = etat.dosage.trim(),
-                    forme = etat.forme,
-                    unitesParBoite = unitesParBoite ?: 0,
-                    stockUnites = stockUnites ?: 0.0,
-                    seuilAlerteJours = etat.seuilAlerteJours.toIntOrNull(),
-                    seuilAlerteUnites = etat.seuilAlerteUnites.toIntOrNull(),
-                    critique = etat.critique,
-                    archiveLe = etat.archiveLe,
-                ),
-                type = etat.type,
-                rythme = etat.rythme,
-                dateDebut = etat.dateDebut,
-                dateFin = etat.dateFin,
-                doses = etat.doses.map { (moment, dose) -> DosePrescrite(moment, dose) },
-                // Une creation n'a pas de passe a proteger : elle prend effet a la
-                // date de debut saisie, meme passee, sous peine de perdre l'ancrage
-                // du rythme (le champ « S'applique a partir du » n'est d'ailleurs
-                // pas affiche a la creation, voir EditionEcran). Une modification
-                // utilise la date d'effet saisie par l'utilisateur.
-                dateEffet = dateEffet,
-            )
+            if (etat.id == 0L) creer(etat, dateEffet) else modifier(etat, dateEffet)
             _etat.update { it.copy(erreur = null, enregistre = true) }
         } catch (erreur: IllegalArgumentException) {
             _etat.update { it.copy(erreur = erreur.message) }
+        }
+    }
+
+    private suspend fun creer(etat: EtatEdition, dateEffet: LocalDate) {
+        enregistrerMedicament(
+            medicament = Medicament(
+                id = 0,
+                nom = etat.nom.trim(),
+                dosage = etat.dosage.trim(),
+                forme = etat.forme,
+                unitesParBoite = etat.unitesParBoite.toIntOrNull() ?: 0,
+                stockUnites = etat.stockUnites.replace(',', '.').toDoubleOrNull() ?: 0.0,
+                seuilAlerteJours = etat.seuilAlerteJours.toIntOrNull(),
+                seuilAlerteUnites = etat.seuilAlerteUnites.toIntOrNull(),
+                critique = etat.critique,
+                archiveLe = etat.archiveLe,
+            ),
+            type = etat.type,
+            rythme = etat.rythme,
+            dateDebut = etat.dateDebut,
+            dateFin = etat.dateFin,
+            doses = dosesSaisies(etat),
+            // Une creation n'a pas de passe a proteger : elle prend effet a la
+            // date de debut saisie, meme passee, sous peine de perdre l'ancrage
+            // du rythme (le champ « S'applique a partir du » n'est d'ailleurs
+            // pas affiche a la creation, voir EditionEcran).
+            dateEffet = dateEffet,
+        )
+    }
+
+    /**
+     * En modification l'ecran n'edite que le traitement. La prescription passe
+     * d'abord : elle seule peut refuser la saisie, et un refus ne doit rien
+     * avoir ecrit. `critique` vit sur la fiche ; on la relit fraiche plutot
+     * que de reporter l'etat charge a l'ouverture, parce que le stock bouge
+     * pendant que l'ecran est ouvert et qu'un `@Update` le ramenerait en arriere.
+     */
+    private suspend fun modifier(etat: EtatEdition, dateEffet: LocalDate) {
+        enregistrerPrescription(
+            medicamentId = etat.id,
+            type = etat.type,
+            rythme = etat.rythme,
+            dateDebut = etat.dateDebut,
+            dateFin = etat.dateFin,
+            doses = dosesSaisies(etat),
+            dateEffet = dateEffet,
+        )
+
+        val fiche = medicaments.parId(etat.id) ?: return
+        if (fiche.critique != etat.critique) {
+            enregistrerFicheMedicament(fiche.copy(critique = etat.critique))
         }
     }
 

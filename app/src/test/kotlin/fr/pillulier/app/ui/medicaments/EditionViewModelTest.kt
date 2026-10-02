@@ -13,6 +13,8 @@ import fr.pillulier.app.data.db.momentsParDefaut
 import fr.pillulier.app.rappels.Notifications
 import fr.pillulier.app.usecase.ArchiverMedicament
 import fr.pillulier.app.usecase.EnregistrerMedicament
+import fr.pillulier.app.usecase.EnregistrerFicheMedicament
+import fr.pillulier.app.usecase.EnregistrerPrescription
 import fr.pillulier.app.usecase.HorlogeFigee
 import fr.pillulier.app.usecase.ProgrammateurEspion
 import fr.pillulier.app.usecase.ReArmerRappels
@@ -47,6 +49,8 @@ class EditionViewModelTest {
     private lateinit var medicaments: DepotMedicaments
     private lateinit var ordonnances: DepotOrdonnances
     private lateinit var creer: EnregistrerMedicament
+    private lateinit var prescrire: EnregistrerPrescription
+    private lateinit var fiche: EnregistrerFicheMedicament
     private lateinit var archive: ArchiverMedicament
     private lateinit var vue: EditionViewModel
     private val horloge = HorlogeFigee(LocalDateTime.of(2026, 1, 5, 7, 0))
@@ -75,6 +79,8 @@ class EditionViewModelTest {
 
         val rafraichirWidget = RafraichirWidget(contexte)
         creer = EnregistrerMedicament(medicaments, ordonnances, reArmer, rafraichirWidget)
+        prescrire = EnregistrerPrescription(ordonnances, reArmer, rafraichirWidget)
+        fiche = EnregistrerFicheMedicament(medicaments, reArmer, rafraichirWidget)
         archive = ArchiverMedicament(
             medicaments = medicaments,
             ordonnances = ordonnances,
@@ -97,6 +103,8 @@ class EditionViewModelTest {
             medicaments = medicaments,
             ordonnances = ordonnances,
             enregistrerMedicament = creer,
+            enregistrerPrescription = prescrire,
+            enregistrerFicheMedicament = fiche,
             archiverMedicament = archive,
             horloge = horloge,
         )
@@ -264,23 +272,23 @@ class EditionViewModelTest {
     }
 
     @Test
-    fun `renommer un traitement date du futur n exige pas de toucher aux dates`() = runTest {
+    fun `modifier un traitement date du futur n exige pas de toucher aux dates`() = runTest {
         // Creation le 5 janvier d un traitement qui ne demarre que le 1er fevrier.
         remplirFormulaireValide()
         vue.modifierDateDebut(LocalDate.of(2026, 2, 1))
         vue.enregistrer().join()
         val id = medicaments.tous().single().id
 
-        // On rouvre l ecran le jour meme pour corriger une faute de frappe :
+        // On rouvre l ecran le jour meme pour le passer en critique :
         // `charger` relit la date de debut de la version a venir, tandis que la
         // date d effet repart d aujourd hui.
         creerVue()
         vue.charger(id).join()
-        vue.modifierNom("Levothyrox 100")
+        vue.modifierCritique(true)
         vue.enregistrer().join()
 
-        assertNull(vue.etat.value.erreur, "un simple renommage ne doit rien exiger d autre")
-        assertEquals("Levothyrox 100", medicaments.parId(id)!!.nom)
+        assertNull(vue.etat.value.erreur, "basculer critique ne doit rien exiger d autre")
+        assertEquals(true, medicaments.parId(id)!!.critique)
         assertEquals(
             LocalDate.of(2026, 2, 1),
             ordonnances.versionsDe(id).single().ordonnance.dateDebut,
@@ -331,11 +339,11 @@ class EditionViewModelTest {
 
         creerVue()
         vue.charger(id).join()
-        vue.modifierNom("Levothyrox 100")
+        vue.modifierCritique(true)
         vue.enregistrer().join()
 
         assertNull(vue.etat.value.erreur)
-        assertEquals("Levothyrox 100", medicaments.parId(id)!!.nom)
+        assertEquals(true, medicaments.parId(id)!!.critique)
         assertNotNull(
             medicaments.parId(id)!!.archiveLe,
             "l enregistrement remplace toute la ligne : il doit reporter la date d archivage",
@@ -419,5 +427,59 @@ class EditionViewModelTest {
         assertEquals(null, vue.etat.value.versionsAEffacer)
         assertEquals(true, vue.etat.value.enregistre)
         assertEquals(2, ordonnances.versionsDe(id).size)
+    }
+
+    @Test
+    fun `modifier le traitement n ecrase pas un stock change pendant l edition`() = runTest {
+        remplirFormulaireValide()
+        vue.modifierStock("30")
+        vue.enregistrer().join()
+        val id = medicaments.tous().single().id
+
+        creerVue()
+        vue.charger(id).join()
+        // Une prise validee depuis une notification, ecran ouvert.
+        base.medicaments().ajusterStock(id, -1.0)
+        vue.definirDose(Moment.SOIR, 2.0)
+        vue.modifierCritique(true)
+        vue.enregistrer().join()
+
+        assertNull(vue.etat.value.erreur)
+        assertEquals(29.0, medicaments.parId(id)!!.stockUnites, "le stock relu a l ouverture ne doit pas revenir")
+        assertEquals(true, medicaments.parId(id)!!.critique)
+    }
+
+    @Test
+    fun `en modification les champs de la fiche ne sont pas ecrits`() = runTest {
+        remplirFormulaireValide()
+        vue.enregistrer().join()
+        val id = medicaments.tous().single().id
+
+        creerVue()
+        vue.charger(id).join()
+        vue.modifierNom("Autre nom")
+        vue.modifierStock("illisible")
+        vue.definirDose(Moment.SOIR, 2.0)
+        vue.enregistrer().join()
+
+        assertNull(vue.etat.value.erreur, "un champ de fiche absent de l ecran ne peut pas bloquer")
+        assertEquals("Levothyrox", medicaments.parId(id)!!.nom)
+        assertEquals(true, vue.etat.value.enregistre)
+    }
+
+    @Test
+    fun `une prescription refusee en modification n ecrit pas critique`() = runTest {
+        remplirFormulaireValide()
+        vue.enregistrer().join()
+        val id = medicaments.tous().single().id
+
+        creerVue()
+        vue.charger(id).join()
+        vue.modifierCritique(true)
+        vue.definirDose(Moment.MATIN, 0.0) // plus aucune dose : refusee
+        vue.enregistrer().join()
+
+        assertNotNull(vue.etat.value.erreur)
+        assertEquals(false, medicaments.parId(id)!!.critique, "un refus ne doit rien avoir ecrit")
     }
 }
