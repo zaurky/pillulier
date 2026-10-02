@@ -80,6 +80,7 @@ Trois classes dans `app/usecase/EnregistrerMedicament.kt`, là où vit déjà
 EnregistrerFicheMedicament(medicament): Long
     require(medicament.nom.isNotBlank())
     require(medicament.unitesParBoite > 0)
+    require(medicament.stockUnites >= 0.0)      // recuperee de CorrigerStock, supprime
     id = medicaments.enregistrer(medicament)
     reArmerRappels() ; rafraichirWidget()
     return id
@@ -171,15 +172,37 @@ reprend pas : il édite la fiche entière, donc il écrit par `EnregistrerFicheM
 dont le `@Update` porte déjà `stockUnites`. Passer en plus par `definirStock` ferait
 deux écritures concurrentes de la même colonne dans le même geste.
 
-`CorrigerStock` et son test deviennent donc du code mort. Deux lectures défendables :
+`CorrigerStock` et son test deviennent donc du code mort, et on les retire :
 
-- **Les retirer**, avec `MedicamentDao.definirStock` si plus personne ne l'appelle. Le
-  dépôt ne garde que les chemins qui servent.
-- **Les garder**, en pariant sur un futur geste de recomptage rapide qui voudra une
-  écriture ciblée plutôt qu'un `@Update` de toute la ligne.
+- `app/usecase/CorrigerStock.kt` supprimé ;
+- `StockViewModel` perd sa dépendance et sa méthode `corriger` ;
+- `MedicamentDao.definirStock` supprimé — son dernier appelant de production part avec
+  `CorrigerStock`, et le garder pour le seul test qui l'exerce reviendrait à tester le
+  dépôt sur un chemin que rien n'emprunte ;
+- les tests `corriger le stock ecrase la valeur` et `corriger avec une valeur negative
+  est refuse` de `StockTest`, et `definir le stock ecrase la valeur` de
+  `PillulierDatabaseTest`, partent avec le code qu'ils couvraient.
 
-À trancher avant l'implémentation. `AjouterBoite` n'est pas concerné : « +1 boîte »
-reste sur la carte et continue d'appeler `ajusterStock`.
+`AjouterBoite` n'est pas concerné : « +1 boîte » reste sur la carte et continue
+d'appeler `ajusterStock`. `StockTest` garde donc ses deux tests qui le couvrent.
+
+### La garde « stock non négatif » doit être récupérée
+
+`CorrigerStock` portait `require(unites >= 0.0)`, et la liste filtrait en plus par
+`takeIf { it >= 0.0 }` avant d'appeler. `EnregistrerMedicament` ne vérifie aujourd'hui
+que le nom et les unités par boîte : il n'a jamais eu à se soucier du stock, puisque le
+seul chemin qui l'écrivait librement était `CorrigerStock`.
+
+Supprimer `CorrigerStock` sans rien faire perdrait donc l'invariant. `EnregistrerFicheMedicament`
+reprend la règle :
+
+```
+require(medicament.stockUnites >= 0.0)
+```
+
+C'est la seule règle du domaine que ce chantier déplace plutôt qu'il ne range. Elle
+remonte au passage d'un cas d'usage de correction ponctuelle vers le cas d'usage qui
+écrit toute fiche : elle vaut désormais aussi à la création, où rien ne l'appliquait.
 
 ## ViewModels
 
@@ -240,7 +263,9 @@ son alarme critique à chaque correction de stock.
 En TDD, dans cet ordre.
 
 1. **`EnregistrerFicheMedicamentTest`** et **`EnregistrerPrescriptionTest`** — les
-   validations déménagées, vérifiées là où elles vivent désormais.
+   validations déménagées, vérifiées là où elles vivent désormais. Dont le stock
+   négatif, récupéré de `CorrigerStock` : le test qui le couvrait disparaît avec son
+   cas d'usage, il doit réapparaître ici avant la suppression, pas après.
 2. **Les deux non-régressions qui sont la raison d'être du chantier** : renommer depuis
    l'écran Stock ne crée aucune nouvelle version d'ordonnance ; modifier la
    prescription ne touche pas `stockUnites`.
