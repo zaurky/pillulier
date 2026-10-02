@@ -269,4 +269,32 @@ class EditionStockViewModelTest {
 
         assertEquals("Doliprane 1000", vue.etat.value.nom)
     }
+
+    @Test
+    fun `une prise validee pendant l edition n est pas annulee`() = runTest {
+        val id = medicament()
+        vue.charger(id).join()
+        // Une prise validee depuis une notification, fiche ouverte.
+        base.medicaments().ajusterStock(id, -1.0)
+
+        vue.modifierNom("Doliprane 1000")
+        vue.enregistrer().join()
+
+        assertNull(vue.etat.value.erreur)
+        assertEquals("Doliprane 1000", medicaments.parId(id)!!.nom)
+        assertEquals(9.0, medicaments.parId(id)!!.stockUnites, "le stock lu a l ouverture ne doit pas revenir")
+    }
+
+    @Test
+    fun `renommer un medicament a stock negatif est accepte`() = runTest {
+        val id = medicament()
+        base.medicaments().ajusterStock(id, -11.0)
+        vue.charger(id).join()
+
+        vue.modifierNom("Doliprane 1000")
+        vue.enregistrer().join()
+
+        assertNull(vue.etat.value.erreur, "le stock affiche n a pas ete touche")
+        assertEquals("Doliprane 1000", medicaments.parId(id)!!.nom)
+    }
 }

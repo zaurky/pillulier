@@ -299,13 +299,24 @@ pas est une erreur de saisie, pas un zéro — puis appelle `EnregistrerFicheMed
 ### Le piège du `@Update`
 
 `DepotMedicaments.enregistrer` fait un `@Update` qui réécrit la ligne entière. Tout
-champ absent de l'objet `Medicament` transmis repart à sa valeur par défaut.
+champ absent de l'objet `Medicament` transmis repart à sa valeur par défaut, et toute
+valeur périmée écrase la base.
 
-`EtatEdition` porte déjà `archiveLe` pour cette seule raison, commentaire à l'appui.
-Séparer l'édition double le nombre d'endroits où le piège se tend : `EtatEditionStock`
-doit porter `critique` **et** `archiveLe` bien qu'aucun des deux ne soit éditable sur
-cet écran. Un écran Stock qui les oublierait désarchiverait un médicament et éteindrait
-son alarme critique à chaque correction de stock.
+`EditionStockViewModel` ne reconstruit donc pas la fiche depuis son état : à
+l'enregistrement il la relit fraîche et n'y pose que les champs de l'écran. `critique`
+et `archiveLe` survivent sans que l'état ait à les porter. Le stock aussi : une prise
+validée depuis une notification pendant que la fiche est ouverte le décrémente, et le
+remettre à la valeur lue à l'ouverture l'annulerait. Le stock saisi ne l'emporte que
+si le champ a changé depuis l'ouverture.
+
+### Un stock négatif se reporte, il ne se saisit pas
+
+`EnregistrerPrise` décrémente le stock sans plancher : prendre sans avoir saisi la
+boîte donne un stock négatif, et c'est voulu. La garde `stockUnites >= 0.0` de
+`EnregistrerFicheMedicament` ne vaut donc que si le stock **change** par rapport à la
+base. Sans cela, un stock déjà négatif interdirait de renommer le médicament depuis
+l'écran Stock, ou de le passer en critique depuis l'écran Traitement — et dans ce
+second cas après avoir déjà écrit la prescription.
 
 ## Tests
 

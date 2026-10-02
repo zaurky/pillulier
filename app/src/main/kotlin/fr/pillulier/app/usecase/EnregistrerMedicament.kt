@@ -29,9 +29,13 @@ class EnregistrerFicheMedicament @Inject constructor(
     suspend operator fun invoke(medicament: Medicament): Long {
         require(medicament.nom.isNotBlank()) { "le nom du medicament est obligatoire" }
         require(medicament.unitesParBoite > 0) { "une boite contient au moins une unite" }
-        // L ecran Stock ecrit le stock recompte avec le reste de la fiche :
-        // cette garde est la seule qui l empeche de devenir negatif.
-        require(medicament.stockUnites >= 0.0) {
+        // Un stock negatif est un etat legitime : EnregistrerPrise decremente
+        // sans plancher quand on prend sans avoir saisi la boite. Ce qu on
+        // refuse, c est d en saisir un — la garde ne vaut donc que si le stock
+        // change, sans quoi un stock deja negatif interdirait de renommer le
+        // medicament ou de le passer en critique.
+        val stockEnBase = if (medicament.id == 0L) null else medicaments.parId(medicament.id)?.stockUnites
+        require(medicament.stockUnites >= 0.0 || medicament.stockUnites == stockEnBase) {
             "un stock ne peut pas etre negatif, recu ${medicament.stockUnites}"
         }
 

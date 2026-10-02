@@ -482,4 +482,23 @@ class EditionViewModelTest {
         assertNotNull(vue.etat.value.erreur)
         assertEquals(false, medicaments.parId(id)!!.critique, "un refus ne doit rien avoir ecrit")
     }
+
+    @Test
+    fun `basculer critique avec un stock negatif l enregistre`() = runTest {
+        // Stock a zero par defaut, puis une prise sans avoir saisi la boite.
+        remplirFormulaireValide()
+        vue.enregistrer().join()
+        val id = medicaments.tous().single().id
+        base.medicaments().ajusterStock(id, -1.0)
+
+        creerVue()
+        vue.charger(id).join()
+        vue.definirDose(Moment.SOIR, 1.0)
+        vue.modifierCritique(true)
+        vue.enregistrer().join()
+
+        assertNull(vue.etat.value.erreur, "un stock que cet ecran ne montre pas ne peut pas bloquer")
+        assertEquals(true, medicaments.parId(id)!!.critique)
+        assertEquals(-1.0, medicaments.parId(id)!!.stockUnites)
+    }
 }

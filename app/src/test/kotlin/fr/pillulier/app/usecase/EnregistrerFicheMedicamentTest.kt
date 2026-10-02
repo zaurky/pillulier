@@ -127,4 +127,27 @@ class EnregistrerFicheMedicamentTest {
         assertFailsWith<IllegalArgumentException> { fiche(levothyrox().copy(stockUnites = -1.0)) }
         assertTrue(medicaments.tous().isEmpty())
     }
+
+    @Test
+    fun `un stock deja negatif se reporte tel quel`() = runTest {
+        // EnregistrerPrise decremente sans plancher : un stock negatif est un
+        // etat legitime, et renommer ce medicament ne doit pas l interdire.
+        val id = medicamentQuotidien()
+        base.medicaments().ajusterStock(id, -31.0)
+
+        fiche(medicaments.parId(id)!!.copy(nom = "Levothyrox 100"))
+
+        assertEquals("Levothyrox 100", medicaments.parId(id)!!.nom)
+        assertEquals(-1.0, medicaments.parId(id)!!.stockUnites)
+    }
+
+    @Test
+    fun `rendre negatif un stock existant est refuse`() = runTest {
+        val id = medicamentQuotidien()
+
+        assertFailsWith<IllegalArgumentException> {
+            fiche(medicaments.parId(id)!!.copy(stockUnites = -2.0))
+        }
+        assertEquals(30.0, medicaments.parId(id)!!.stockUnites)
+    }
 }

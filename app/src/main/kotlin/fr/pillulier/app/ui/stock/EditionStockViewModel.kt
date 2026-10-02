@@ -8,14 +8,12 @@ import fr.pillulier.app.data.DepotOrdonnances
 import fr.pillulier.app.temps.Horloge
 import fr.pillulier.app.usecase.EnregistrerFicheMedicament
 import fr.pillulier.domain.Forme
-import fr.pillulier.domain.Medicament
 import fr.pillulier.domain.TypeOrdonnance
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import java.time.Instant
 import javax.inject.Inject
 
 data class EtatEditionStock(
@@ -29,13 +27,8 @@ data class EtatEditionStock(
     val seuilAlerteUnites: String = "",
     /** Lu sur l'ordonnance en vigueur, jamais édité ici : décide quel seuil s'affiche. */
     val aLaDemande: Boolean = false,
-    /**
-     * Ni l'un ni l'autre ne s'éditent sur cet écran, mais `@Update` réécrit la
-     * ligne entière : les omettre désarchiverait le médicament et éteindrait
-     * son alarme critique à chaque correction de stock.
-     */
-    val critique: Boolean = false,
-    val archiveLe: Instant? = null,
+    /** Le stock tel que lu à l'ouverture : tant que le champ le garde, on reprend celui de la base. */
+    val stockLu: String = "",
     val erreur: String? = null,
     val enregistre: Boolean = false,
 )
@@ -68,11 +61,10 @@ class EditionStockViewModel @Inject constructor(
             forme = medicament.forme,
             unitesParBoite = medicament.unitesParBoite.toString(),
             stockUnites = medicament.stockUnites.toString(),
+            stockLu = medicament.stockUnites.toString(),
             seuilAlerteJours = medicament.seuilAlerteJours?.toString() ?: "",
             seuilAlerteUnites = medicament.seuilAlerteUnites?.toString() ?: "",
             aLaDemande = ordonnance?.ordonnance?.type == TypeOrdonnance.A_LA_DEMANDE,
-            critique = medicament.critique,
-            archiveLe = medicament.archiveLe,
         )
     }
 
@@ -111,19 +103,23 @@ class EditionStockViewModel @Inject constructor(
             return@launch
         }
 
+        // La fiche est relue fraiche, et seuls les champs de l'ecran s'y
+        // posent : `@Update` reecrit la ligne entiere, et ce qui a bouge
+        // depuis l'ouverture — critique, archivage, et surtout le stock
+        // decremente par une prise validee depuis une notification — doit
+        // survivre. Le stock saisi ne l'emporte que si le champ a change.
+        val fiche = medicaments.parId(etat.id) ?: return@launch
+
         try {
             enregistrerFicheMedicament(
-                Medicament(
-                    id = etat.id,
+                fiche.copy(
                     nom = etat.nom.trim(),
                     dosage = etat.dosage.trim(),
                     forme = etat.forme,
                     unitesParBoite = unitesParBoite ?: 0,
-                    stockUnites = stockUnites ?: 0.0,
+                    stockUnites = if (etat.stockUnites == etat.stockLu) fiche.stockUnites else stockUnites ?: 0.0,
                     seuilAlerteJours = seuilJours,
                     seuilAlerteUnites = seuilUnites,
-                    critique = etat.critique,
-                    archiveLe = etat.archiveLe,
                 ),
             )
             _etat.update { it.copy(erreur = null, enregistre = true) }
