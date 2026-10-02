@@ -22,7 +22,6 @@ class StockTest {
 
     private lateinit var base: PillulierDatabase
     private lateinit var ajouterBoite: AjouterBoite
-    private lateinit var corrigerStock: CorrigerStock
 
     @Before
     fun ouvrir() {
@@ -31,7 +30,6 @@ class StockTest {
             PillulierDatabase::class.java,
         ).addCallback(momentsParDefaut).allowMainThreadQueries().build()
         ajouterBoite = AjouterBoite(base.medicaments())
-        corrigerStock = CorrigerStock(base.medicaments())
     }
 
     @After
@@ -58,22 +56,6 @@ class StockTest {
         ajouterBoite(id)
 
         assertEquals(20.0, base.medicaments().parId(id)!!.stockUnites)
-    }
-
-    @Test
-    fun `corriger le stock ecrase la valeur`() = runTest {
-        val id = medicament(stock = 4.0, unitesParBoite = 16)
-
-        corrigerStock(id, 12.5)
-
-        assertEquals(12.5, base.medicaments().parId(id)!!.stockUnites)
-    }
-
-    @Test
-    fun `corriger avec une valeur negative est refuse`() = runTest {
-        val id = medicament(stock = 4.0, unitesParBoite = 16)
-
-        assertFailsWith<IllegalArgumentException> { corrigerStock(id, -1.0) }
     }
 
     @Test

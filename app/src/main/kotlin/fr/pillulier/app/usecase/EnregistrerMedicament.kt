@@ -29,8 +29,8 @@ class EnregistrerFicheMedicament @Inject constructor(
     suspend operator fun invoke(medicament: Medicament): Long {
         require(medicament.nom.isNotBlank()) { "le nom du medicament est obligatoire" }
         require(medicament.unitesParBoite > 0) { "une boite contient au moins une unite" }
-        // Reprise de CorrigerStock, seul chemin qui ecrivait le stock librement
-        // avant que l ecran Stock n edite la fiche entiere.
+        // L ecran Stock ecrit le stock recompte avec le reste de la fiche :
+        // cette garde est la seule qui l empeche de devenir negatif.
         require(medicament.stockUnites >= 0.0) {
             "un stock ne peut pas etre negatif, recu ${medicament.stockUnites}"
         }

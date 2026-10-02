@@ -90,15 +90,6 @@ class PillulierDatabaseTest {
     }
 
     @Test
-    fun `definir le stock ecrase la valeur`() = runTest {
-        val id = base.medicaments().inserer(medicament(stock = 10.0))
-
-        base.medicaments().definirStock(id, 42.0)
-
-        assertEquals(42.0, base.medicaments().parId(id)!!.stockUnites)
-    }
-
-    @Test
     fun `une ordonnance revient avec ses doses`() = runTest {
         val medicamentId = base.medicaments().inserer(medicament())
         val ordonnanceId = base.ordonnances().insererOrdonnance(

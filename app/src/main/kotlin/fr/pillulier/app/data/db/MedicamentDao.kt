@@ -33,7 +33,4 @@ interface MedicamentDao {
 
     @Query("UPDATE medicament SET stockUnites = stockUnites + :delta WHERE id = :id")
     suspend fun ajusterStock(id: Long, delta: Double)
-
-    @Query("UPDATE medicament SET stockUnites = :valeur WHERE id = :id")
-    suspend fun definirStock(id: Long, valeur: Double)
 }
