@@ -34,11 +34,10 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import fr.pillulier.app.ui.ChampsFiche
 import fr.pillulier.app.ui.formaterDose
-import fr.pillulier.app.ui.libelleForme
 import fr.pillulier.app.ui.libelleJour
 import fr.pillulier.app.ui.libelleMoment
-import fr.pillulier.domain.Forme
 import fr.pillulier.domain.Moment
 import fr.pillulier.domain.Rythme
 import fr.pillulier.domain.TypeOrdonnance
@@ -127,39 +126,17 @@ fun EditionEcran(
         // La fiche se saisit a la creation, puis se corrige depuis l'onglet
         // Stock : en modification cet ecran n'edite que le traitement.
         if (etat.id == 0L) {
-            OutlinedTextField(
-                value = etat.nom,
-                onValueChange = vue::modifierNom,
-                label = { Text("Nom") },
-                modifier = Modifier.fillMaxWidth(),
-            )
-            OutlinedTextField(
-                value = etat.dosage,
-                onValueChange = vue::modifierDosage,
-                label = { Text("Dosage") },
-                modifier = Modifier.fillMaxWidth(),
-            )
-
-            Text("Forme", style = MaterialTheme.typography.titleSmall)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Forme.entries.forEach { forme ->
-                    FilterChip(
-                        selected = etat.forme == forme,
-                        onClick = { vue.modifierForme(forme) },
-                        label = { Text(libelleForme(forme, 1.0)) },
-                    )
-                }
-            }
-
-            OutlinedTextField(
-                value = etat.unitesParBoite,
-                onValueChange = vue::modifierUnitesParBoite,
-                label = { Text("Unités par boîte") },
-            )
-            OutlinedTextField(
-                value = etat.stockUnites,
-                onValueChange = vue::modifierStock,
-                label = { Text("Stock actuel en unités") },
+            ChampsFiche(
+                nom = etat.nom,
+                surNom = vue::modifierNom,
+                dosage = etat.dosage,
+                surDosage = vue::modifierDosage,
+                forme = etat.forme,
+                surForme = vue::modifierForme,
+                unitesParBoite = etat.unitesParBoite,
+                surUnitesParBoite = vue::modifierUnitesParBoite,
+                stockUnites = etat.stockUnites,
+                surStock = vue::modifierStock,
             )
         }
 

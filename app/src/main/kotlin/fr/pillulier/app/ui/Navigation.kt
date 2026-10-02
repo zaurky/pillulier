@@ -29,6 +29,7 @@ import fr.pillulier.app.ui.medicaments.EditionEcran
 import fr.pillulier.app.ui.medicaments.MedicamentsEcran
 import fr.pillulier.app.ui.preferences.PreferencesEcran
 import fr.pillulier.app.ui.semaine.SemaineEcran
+import fr.pillulier.app.ui.stock.EditionStockEcran
 import fr.pillulier.app.ui.stock.StockEcran
 
 /**
@@ -100,7 +101,15 @@ fun PillulierNavigation(controleur: NavHostController = rememberNavController())
                     surSortie = { controleur.popBackStack() },
                 )
             }
-            composable("stock") { StockEcran() }
+            composable("stock") {
+                StockEcran(surSelection = { id -> controleur.navigate("stock/$id") })
+            }
+            composable("stock/{id}") { entreeRoute ->
+                EditionStockEcran(
+                    medicamentId = entreeRoute.arguments?.getString("id")?.toLongOrNull() ?: 0L,
+                    surSortie = { controleur.popBackStack() },
+                )
+            }
             composable("preferences") { PreferencesEcran() }
         }
     }
