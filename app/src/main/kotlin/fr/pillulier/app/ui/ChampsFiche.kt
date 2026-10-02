@@ -1,7 +1,8 @@
 package fr.pillulier.app.ui
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
@@ -16,6 +17,9 @@ import fr.pillulier.domain.Forme
  * Identite et conditionnement d'un medicament. Emet ses champs dans la colonne
  * de l'appelant : la creation et l'ecran Stock les espacent a leur facon.
  */
+// FlowRow reste marque experimental dans le BOM 2025.03.00, son API est
+// stable dans les faits depuis foundation 1.7.
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ChampsFiche(
     nom: String,
@@ -43,7 +47,12 @@ fun ChampsFiche(
     )
 
     Text("Forme", style = MaterialTheme.typography.titleSmall)
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    // Quatre puces ne tiennent pas sur une ligne : « injection » se cassait en
+    // deux. FlowRow renvoie la derniere a la ligne, entiere.
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
         Forme.entries.forEach { candidate ->
             FilterChip(
                 selected = forme == candidate,

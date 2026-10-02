@@ -1,11 +1,14 @@
 package fr.pillulier.app.ui.stock
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -16,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import fr.pillulier.app.ui.couleursRenouvellement
 import fr.pillulier.app.usecase.LigneStock
 import java.time.format.DateTimeFormatter
 
@@ -53,8 +57,16 @@ fun StockEcran(
 private fun LigneStockCarte(ligne: LigneStock, surSelection: (Long) -> Unit, vue: StockViewModel) {
     // Le recomptage se saisit dans la fiche : un seul endroit pour une meme
     // valeur. « +1 boite » reste ici, geste d'une touche sans saisie.
+    // Une boite a renouveler se lit de loin : toute la carte passe a l'orange,
+    // texte et bouton compris, au lieu d'un seul libelle rouge.
+    val (fondAlerte, texteAlerte) = couleursRenouvellement()
     Card(
         onClick = { surSelection(ligne.medicamentId) },
+        colors = if (ligne.enAlerte) {
+            CardDefaults.cardColors(containerColor = fondAlerte, contentColor = texteAlerte)
+        } else {
+            CardDefaults.cardColors()
+        },
         modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
@@ -73,16 +85,18 @@ private fun LigneStockCarte(ligne: LigneStock, surSelection: (Long) -> Unit, vue
             }
 
             if (ligne.enAlerte) {
-                Text(
-                    "À renouveler",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.error,
-                )
+                Text("À renouveler", style = MaterialTheme.typography.labelLarge)
             }
 
             OutlinedButton(
                 onClick = { vue.ajouterBoite(ligne.medicamentId) },
                 modifier = Modifier.padding(top = 8.dp),
+                colors = if (ligne.enAlerte) {
+                    ButtonDefaults.outlinedButtonColors(contentColor = texteAlerte)
+                } else {
+                    ButtonDefaults.outlinedButtonColors()
+                },
+                border = if (ligne.enAlerte) BorderStroke(1.dp, texteAlerte) else ButtonDefaults.outlinedButtonBorder(),
             ) {
                 Text("+1 boîte")
             }

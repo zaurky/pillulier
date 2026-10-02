@@ -1,12 +1,16 @@
 package fr.pillulier.app.ui.medicaments
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -18,6 +22,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -30,6 +35,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -44,6 +54,8 @@ import fr.pillulier.domain.TypeOrdonnance
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
+import java.time.format.TextStyle
+import java.util.Locale
 
 private const val MILLIS_PAR_JOUR = 86_400_000L
 
@@ -183,13 +195,16 @@ fun EditionEcran(
                 )
             }
 
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            // Sept FilterChip debordaient : « Di » sortait de l'ecran. Sept
+            // pastilles de 40 dp tiennent jusqu'a un ecran de 320 dp.
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                val actifs = (etat.rythme as? Rythme.JoursDeSemaine)?.jours ?: emptySet()
                 DayOfWeek.entries.forEach { jour ->
-                    val actifs = (etat.rythme as? Rythme.JoursDeSemaine)?.jours ?: emptySet()
-                    FilterChip(
-                        selected = jour in actifs,
-                        onClick = { vue.basculerJourDeSemaine(jour) },
-                        label = { Text(libelleJour(jour)) },
+                    PastilleJour(
+                        libelle = libelleJour(jour),
+                        description = jour.getDisplayName(TextStyle.FULL, Locale.FRENCH),
+                        coche = jour in actifs,
+                        surClic = { vue.basculerJourDeSemaine(jour) },
                     )
                 }
             }
@@ -225,14 +240,19 @@ fun EditionEcran(
 
             Text("Doses par moment", style = MaterialTheme.typography.titleSmall)
             Moment.entries.forEach { moment ->
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(libelleMoment(moment), modifier = Modifier.padding(end = 8.dp))
+                // Le moment prend la place libre, les boutons se calent a droite :
+                // les quatre lignes s'alignent en colonne quelle que soit la
+                // longueur du libelle. La largeur fixe de la dose garde le « + »
+                // immobile entre « 0 » et « 1½ ».
+                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text(libelleMoment(moment), modifier = Modifier.weight(1f))
                     OutlinedButton(onClick = { vue.definirDose(moment, (etat.doses[moment] ?: 0.0) - 0.5) }) {
                         Text("−")
                     }
                     Text(
                         formaterDose(etat.doses[moment] ?: 0.0),
-                        modifier = Modifier.padding(horizontal = 12.dp),
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.width(48.dp),
                     )
                     OutlinedButton(onClick = { vue.definirDose(moment, (etat.doses[moment] ?: 0.0) + 0.5) }) {
                         Text("+")
@@ -267,6 +287,33 @@ fun EditionEcran(
 }
 
 private val formatDate = DateTimeFormatter.ofPattern("dd/MM/yyyy")
+
+@Composable
+private fun PastilleJour(
+    libelle: String,
+    description: String,
+    coche: Boolean,
+    surClic: () -> Unit,
+) {
+    val couleurs = MaterialTheme.colorScheme
+    Surface(
+        onClick = surClic,
+        shape = CircleShape,
+        color = if (coche) couleurs.primary else Color.Transparent,
+        contentColor = if (coche) couleurs.onPrimary else couleurs.onSurface,
+        border = if (coche) null else BorderStroke(1.dp, couleurs.outline),
+        modifier = Modifier
+            .size(40.dp)
+            .semantics {
+                contentDescription = description
+                selected = coche
+            },
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Text(libelle, style = MaterialTheme.typography.labelLarge)
+        }
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

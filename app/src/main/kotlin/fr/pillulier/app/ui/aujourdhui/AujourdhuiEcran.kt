@@ -7,8 +7,10 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -18,6 +20,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import fr.pillulier.app.ui.CapsuleALaDemande
 import fr.pillulier.app.ui.CapsulePrise
+import fr.pillulier.app.ui.couleursRenouvellement
 import fr.pillulier.app.ui.libelleMoment
 import fr.pillulier.domain.StatutPrise
 import java.time.format.DateTimeFormatter
@@ -36,9 +39,23 @@ fun AujourdhuiEcran(vue: AujourdhuiViewModel = hiltViewModel()) {
     LazyColumn(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
         if (etat.alertes.isNotEmpty()) {
             item {
-                Section("À renouveler") {
-                    etat.alertes.forEach { alerte ->
-                        Text("${alerte.nom} : ${alerte.message}", style = MaterialTheme.typography.bodyMedium)
+                // Seul bloc encadre de la journee : une boite qui s'epuise se
+                // traite avant la prochaine prise, elle doit se voir en premier.
+                val (fond, texte) = couleursRenouvellement()
+                Surface(
+                    color = fond,
+                    contentColor = texte,
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        Text("À renouveler", style = MaterialTheme.typography.titleSmall)
+                        etat.alertes.forEach { alerte ->
+                            Text("${alerte.nom} : ${alerte.message}", style = MaterialTheme.typography.bodyMedium)
+                        }
                     }
                 }
             }
