@@ -17,15 +17,88 @@ import java.time.LocalDate
 import javax.inject.Inject
 
 /**
- * Écrit le médicament et son ordonnance, puis réarme la fenêtre : toute
- * modification de posologie doit se refléter tout de suite dans les alarmes.
+ * Ecrit la fiche du medicament — identite, conditionnement, stock, seuils —
+ * sans toucher a ses ordonnances, puis rearme : le nom figure dans les
+ * notifications, et `critique` choisit entre notification et alarme.
  */
-class EnregistrerMedicament @Inject constructor(
+class EnregistrerFicheMedicament @Inject constructor(
     private val medicaments: DepotMedicaments,
+    private val reArmerRappels: ReArmerRappels,
+    private val rafraichirWidget: RafraichirWidget,
+) {
+    suspend operator fun invoke(medicament: Medicament): Long {
+        require(medicament.nom.isNotBlank()) { "le nom du medicament est obligatoire" }
+        require(medicament.unitesParBoite > 0) { "une boite contient au moins une unite" }
+        // Reprise de CorrigerStock, seul chemin qui ecrivait le stock librement
+        // avant que l ecran Stock n edite la fiche entiere.
+        require(medicament.stockUnites >= 0.0) {
+            "un stock ne peut pas etre negatif, recu ${medicament.stockUnites}"
+        }
+
+        val id = medicaments.enregistrer(medicament)
+
+        reArmerRappels()
+        rafraichirWidget()
+        return id
+    }
+}
+
+/**
+ * Ecrit une nouvelle version de prescription a partir de [dateEffet], puis
+ * rearme : toute modification de posologie doit se refleter tout de suite
+ * dans les alarmes.
+ */
+class EnregistrerPrescription @Inject constructor(
     private val ordonnances: DepotOrdonnances,
     private val reArmerRappels: ReArmerRappels,
     private val rafraichirWidget: RafraichirWidget,
 ) {
+    suspend operator fun invoke(
+        medicamentId: Long,
+        type: TypeOrdonnance,
+        rythme: Rythme,
+        dateDebut: LocalDate,
+        dateFin: LocalDate?,
+        doses: List<DosePrescrite>,
+        dateEffet: LocalDate,
+    ) {
+        validerPrescription(type, dateDebut, dateFin, doses)
+
+        ordonnances.enregistrerVersion(
+            medicamentId = medicamentId,
+            ordonnance = Ordonnance(
+                id = 0,
+                medicamentId = medicamentId,
+                type = type,
+                rythme = rythme,
+                dateDebut = dateEffet,
+                dateFin = dateFin,
+                dateAncrage = dateEffet,
+            ),
+            doses = if (type == TypeOrdonnance.PLANIFIEE) doses else emptyList(),
+            dateEffet = dateEffet,
+        )
+
+        reArmerRappels()
+        rafraichirWidget()
+    }
+}
+
+/**
+ * Cree un medicament d un bloc : sa fiche et sa premiere prescription. Toutes
+ * les regles passent avant la premiere ecriture — composer naivement les deux
+ * feuilles insererait la fiche avant de refuser une ordonnance sans dose, et
+ * laisserait un medicament sans prescription.
+ */
+class EnregistrerMedicament @Inject constructor(
+    medicaments: DepotMedicaments,
+    ordonnances: DepotOrdonnances,
+    reArmerRappels: ReArmerRappels,
+    rafraichirWidget: RafraichirWidget,
+) {
+    private val fiche = EnregistrerFicheMedicament(medicaments, reArmerRappels, rafraichirWidget)
+    private val prescription = EnregistrerPrescription(ordonnances, reArmerRappels, rafraichirWidget)
+
     suspend operator fun invoke(
         medicament: Medicament,
         type: TypeOrdonnance,
@@ -35,11 +108,6 @@ class EnregistrerMedicament @Inject constructor(
         doses: List<DosePrescrite>,
         dateEffet: LocalDate,
     ): Long {
-        require(medicament.nom.isNotBlank()) { "le nom du medicament est obligatoire" }
-        require(medicament.unitesParBoite > 0) { "une boite contient au moins une unite" }
-        require(dateFin == null || !dateFin.isBefore(dateDebut)) {
-            "la date de fin ne peut pas preceder la date de debut"
-        }
         // Le garde ne tient qu a la creation, seul moment ou `dateDebut` porte
         // vraiment le debut du traitement. A la modification, l ecran l a rempli
         // avec le debut de la version en vigueur : le comparer refuserait de
@@ -53,34 +121,29 @@ class EnregistrerMedicament @Inject constructor(
                 "la date d effet ne peut pas preceder le debut du traitement"
             }
         }
-        if (type == TypeOrdonnance.PLANIFIEE) {
-            require(doses.isNotEmpty()) { "une ordonnance planifiee doit porter au moins une dose" }
-            require(doses.all { it.dose > 0.0 }) { "une dose doit etre strictement positive" }
-            require(doses.map { it.moment }.distinct().size == doses.size) {
-                "un moment ne peut porter qu une dose"
-            }
-        }
+        validerPrescription(type, dateDebut, dateFin, doses)
 
-        val id = medicaments.enregistrer(medicament)
-
-        ordonnances.enregistrerVersion(
-            medicamentId = id,
-            ordonnance = Ordonnance(
-                id = 0,
-                medicamentId = id,
-                type = type,
-                rythme = rythme,
-                dateDebut = dateEffet,
-                dateFin = dateFin,
-                dateAncrage = dateEffet,
-            ),
-            doses = if (type == TypeOrdonnance.PLANIFIEE) doses else emptyList(),
-            dateEffet = dateEffet,
-        )
-
-        reArmerRappels()
-        rafraichirWidget()
+        val id = fiche(medicament)
+        prescription(id, type, rythme, dateDebut, dateFin, doses, dateEffet)
         return id
+    }
+}
+
+private fun validerPrescription(
+    type: TypeOrdonnance,
+    dateDebut: LocalDate,
+    dateFin: LocalDate?,
+    doses: List<DosePrescrite>,
+) {
+    require(dateFin == null || !dateFin.isBefore(dateDebut)) {
+        "la date de fin ne peut pas preceder la date de debut"
+    }
+    if (type == TypeOrdonnance.PLANIFIEE) {
+        require(doses.isNotEmpty()) { "une ordonnance planifiee doit porter au moins une dose" }
+        require(doses.all { it.dose > 0.0 }) { "une dose doit etre strictement positive" }
+        require(doses.map { it.moment }.distinct().size == doses.size) {
+            "un moment ne peut porter qu une dose"
+        }
     }
 }
 

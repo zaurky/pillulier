@@ -343,4 +343,38 @@ class EnregistrerMedicamentTest {
         assertEquals(LocalDate.of(2026, 1, 9), versions.first().ordonnance.dateFin)
         assertEquals(LocalDate.of(2026, 1, 10), versions.last().ordonnance.dateDebut)
     }
+
+    @Test
+    fun `une creation refusee pour sa prescription n ecrit aucun medicament`() = runTest {
+        // Composer fiche puis prescription inserait la ligne avant de refuser :
+        // toutes les regles doivent passer avant la premiere ecriture.
+        assertFailsWith<IllegalArgumentException> {
+            enregistrer(
+                medicament = levothyrox(),
+                type = TypeOrdonnance.PLANIFIEE,
+                rythme = Rythme.TousLesJours,
+                dateDebut = LocalDate.of(2026, 1, 1),
+                dateFin = null,
+                doses = emptyList(),
+                dateEffet = LocalDate.of(2026, 1, 1),
+            )
+        }
+
+        assertTrue(medicaments.tous().isEmpty(), "aucun medicament sans prescription")
+    }
+
+    @Test
+    fun `une creation avec un stock negatif est refusee`() = runTest {
+        assertFailsWith<IllegalArgumentException> {
+            enregistrer(
+                medicament = levothyrox().copy(stockUnites = -1.0),
+                type = TypeOrdonnance.PLANIFIEE,
+                rythme = Rythme.TousLesJours,
+                dateDebut = LocalDate.of(2026, 1, 1),
+                dateFin = null,
+                doses = listOf(DosePrescrite(Moment.MATIN, 1.0)),
+                dateEffet = LocalDate.of(2026, 1, 1),
+            )
+        }
+    }
 }
