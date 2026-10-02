@@ -96,7 +96,8 @@ EnregistrerPrescription(
     reArmerRappels() ; rafraichirWidget()
 
 EnregistrerMedicament(medicament, type, rythme, dateDebut, dateFin, doses, dateEffet): Long
-    require(!dateEffet.isBefore(dateDebut))
+    si medicament.id == 0L : require(!dateEffet.isBefore(dateDebut))
+    validerPrescription(type, dateDebut, dateFin, doses)   // avant toute ecriture
     id = ficheMedicament(medicament)
     prescription(id, type, rythme, dateDebut, dateFin, doses, dateEffet)
     return id
@@ -109,7 +110,7 @@ code qui versionne les prescriptions.
 `EnregistrerMedicament` garde sa signature publique : la création l'appelle comme
 avant, et son test existant reste le filet qui dit que la composition n'a rien perdu.
 
-### Le garde de date d'effet remonte dans la composition
+### Le garde de date d'effet ne descend pas dans la prescription
 
 `require(!dateEffet.isBefore(dateDebut))` ne vaut aujourd'hui qu'à la création, testé
 par `medicament.id == 0L`. Le commentaire en place explique pourquoi : à la
@@ -119,9 +120,10 @@ précisément pour servir.
 
 `EnregistrerPrescription` ne reçoit plus de `Medicament`, donc plus de `id == 0L` à
 tester. Plutôt que de lui passer un `creation: Boolean` — un paramètre dont l'oubli
-rendrait le garde silencieusement inopérant — le garde remonte dans
-`EnregistrerMedicament`, seul chemin de création. `EnregistrerPrescription` n'a alors
-qu'une règle de date, celle qui vaut toujours.
+rendrait le garde silencieusement inopérant — le garde reste dans
+`EnregistrerMedicament`, tel quel, conditionné à `medicament.id == 0L` (voir « La
+création valide tout avant d'écrire quoi que ce soit »). `EnregistrerPrescription`
+n'a alors qu'une règle de date, celle qui vaut toujours.
 
 ### Le double réarmement à la création est assumé
 
@@ -223,6 +225,53 @@ et ne sont plus exposés au clavier.
 
 Tout le reste ne bouge pas : confirmation d'effacement de versions, comparaison par
 `prescritLaMemeChose`, date d'effet, archivage, garde `dejaCharge`.
+
+### `critique` traverse la frontière
+
+L'écran Traitement édite `critique`, qui vit sur `Medicament`. En modification,
+`EditionViewModel` n'écrit donc pas *que* la prescription :
+
+```
+modifier()
+    EnregistrerPrescription(id, ...)           // seule a pouvoir refuser la saisie
+    fiche = medicaments.parId(id)              // relue fraiche, pas l etat charge
+    si fiche.critique != etat.critique :
+        EnregistrerFicheMedicament(fiche.copy(critique = etat.critique))
+```
+
+La prescription passe d'abord : un refus ne doit rien avoir écrit. La fiche est
+relue plutôt que reconstruite depuis l'état chargé à l'ouverture, parce que le stock
+bouge pendant que l'écran est ouvert — une prise validée depuis une notification,
+un « +1 boîte » — et qu'un `@Update` de l'état d'ouverture le ramènerait en arrière.
+C'est d'ailleurs un défaut de l'écran actuel que ce découpage corrige au passage.
+
+### La création valide tout avant d'écrire quoi que ce soit
+
+Aujourd'hui toutes les validations précèdent la première écriture. Composer naïvement
+`fiche` puis `prescription` casserait cela : une ordonnance planifiée sans dose ne
+serait refusée qu'**après** l'insertion du médicament, qui resterait sans
+prescription. Les règles de prescription sont donc une fonction privée du fichier,
+appelée par `EnregistrerPrescription` et, en tête, par `EnregistrerMedicament`.
+
+Le garde `dateEffet >= dateDebut` reste dans `EnregistrerMedicament` sous sa forme
+actuelle, conditionné à `medicament.id == 0L` : d'autres cas d'usage et tests
+appellent encore `EnregistrerMedicament` sur un médicament existant pour des
+corrections rétroactives, et le rendre inconditionnel les casserait.
+
+### L'écran Stock ne crée jamais
+
+La route `stock/{id}` n'est atteinte qu'avec un identifiant réel. Si elle l'était sans
+— identifiant illisible, médicament introuvable — l'état resterait à `id = 0`, et
+« Enregistrer » insérerait une fiche sans prescription. `EditionStockViewModel`
+refuse donc d'enregistrer tant qu'aucun médicament n'est chargé.
+
+### Un seuil illisible est une erreur
+
+Les seuils sont aujourd'hui lus par `toIntOrNull()` sans contrôle : « 7j » devient
+`null`, c'est-à-dire la valeur par défaut des préférences, sans un mot. Sur un écran
+dont le seuil est l'un des six champs, effacer en silence un réglage sur une faute de
+frappe n'est pas défendable. L'écran Stock traite un seuil non vide illisible comme
+les deux autres champs numériques.
 
 ### `EditionStockViewModel`
 
