@@ -14,7 +14,8 @@ import javax.inject.Inject
  * appelé après toute écriture qui change ce que la journée affiche, ou ce que
  * `ReArmerRappels` recalcule — la coche et l'enregistrement à la demande
  * depuis l'écran Aujourd'hui (`AujourdhuiViewModel`), les actions *Pris* et
- * *Plus tard* d'une notification (`RecepteurActionPrise`), un changement
+ * *Plus tard* d'une notification (`RecepteurActionPrise`) ou de l'alarme
+ * plein écran d'un médicament critique (`AlarmeViewModel`), un changement
  * d'heure de moment (`PreferencesViewModel`), l'enregistrement ou l'archivage
  * d'un médicament (`EnregistrerMedicament`, `ArchiverMedicament`),
  * le passage à un nouveau jour (`ClotureQuotidienne`, réveillée par l'alarme

@@ -11,6 +11,7 @@ import fr.pillulier.app.data.db.momentsParDefaut
 import fr.pillulier.app.usecase.EnregistrerPrise
 import fr.pillulier.app.usecase.HorlogeFigee
 import fr.pillulier.app.usecase.ProgrammateurEspion
+import fr.pillulier.app.widget.RafraichirWidget
 import fr.pillulier.domain.CleRappel
 import fr.pillulier.domain.Forme
 import fr.pillulier.domain.Moment
@@ -49,6 +50,7 @@ class AlarmeViewModelTest {
             programmateur = programmateur,
             notifications = Notifications(ApplicationProvider.getApplicationContext()),
             horloge = horloge,
+            rafraichirWidget = RafraichirWidget(ApplicationProvider.getApplicationContext()),
         )
     }
 

@@ -9,6 +9,7 @@ import fr.pillulier.app.temps.Horloge
 import fr.pillulier.app.ui.libelleDoseComplete
 import fr.pillulier.app.ui.libelleMoment
 import fr.pillulier.app.usecase.EnregistrerPrise
+import fr.pillulier.app.widget.RafraichirWidget
 import fr.pillulier.domain.CleRappel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -33,6 +34,7 @@ class AlarmeViewModel @Inject constructor(
     private val programmateur: ProgrammateurAlarmes,
     private val notifications: Notifications,
     private val horloge: Horloge,
+    private val rafraichirWidget: RafraichirWidget,
 ) : ViewModel() {
 
     private val _etat = MutableStateFlow(EtatAlarme())
@@ -68,6 +70,7 @@ class AlarmeViewModel @Inject constructor(
         enregistrerPrise(cle.medicamentId, cle.date, cle.moment, dose)
         programmateur.annuler(cle)
         notifications.retirer(cle)
+        rafraichirWidget()
         _etat.update { it.copy(termine = true) }
     }
 
@@ -76,6 +79,7 @@ class AlarmeViewModel @Inject constructor(
         val delai = preferences.instantane().delaiPlusTardMinutes
         programmateur.programmer(cle, horloge.maintenant().plusMinutes(delai.toLong()), critique = true)
         notifications.retirer(cle)
+        rafraichirWidget()
         _etat.update { it.copy(termine = true) }
     }
 
