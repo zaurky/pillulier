@@ -5,11 +5,6 @@ import android.content.Context
 import android.content.Intent
 import android.util.Log
 import dagger.hilt.android.AndroidEntryPoint
-import fr.pillulier.app.data.DepotMedicaments
-import fr.pillulier.app.data.DepotOrdonnances
-import fr.pillulier.app.data.DepotPreferences
-import fr.pillulier.app.temps.Horloge
-import fr.pillulier.app.widget.RafraichirWidget
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -17,51 +12,23 @@ import javax.inject.Inject
 
 private const val ETIQUETTE = "RecepteurRappel"
 
-/**
- * Poste la notification du médicament attendu, puis arme immédiatement la
- * relance suivante. La chaîne s'interrompt quand la prise est enregistrée ou à
- * la clôture de la journée, qui annule la clé.
- */
+/** Reçoit l'alarme d'un rappel et la confie à [DeclencherRappel]. */
 @AndroidEntryPoint
 class RecepteurRappel : BroadcastReceiver() {
 
-    @Inject lateinit var medicaments: DepotMedicaments
-    @Inject lateinit var ordonnances: DepotOrdonnances
-    @Inject lateinit var preferences: DepotPreferences
-    @Inject lateinit var notifications: Notifications
-    @Inject lateinit var programmateur: ProgrammateurAlarmes
-    @Inject lateinit var horloge: Horloge
-    @Inject lateinit var rafraichirWidget: RafraichirWidget
+    @Inject lateinit var declencherRappel: DeclencherRappel
 
     override fun onReceive(context: Context, intent: Intent) {
         val cle = cleDepuisIntent(intent)
         val critique = intent.getBooleanExtra(EXTRA_CRITIQUE, false)
+        // Une alarme armée avant l'apparition du préavis n'a pas de phase :
+        // elle sonne, comme avant.
+        val phase = intent.getStringExtra(EXTRA_PHASE)?.let(Phase::valueOf) ?: Phase.SONNERIE
         val termine = goAsync()
 
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                // « Aucune relance ne survit au lendemain » est un invariant du
-                // rappel lui-même, pas une conséquence de la clôture de 00h05 :
-                // le travail périodique est reportable, et une chaîne d'hier
-                // relancerait sinon toutes les quinze minutes en pleine nuit.
-                if (cle.date != horloge.aujourdhui()) return@launch
-
-                val medicament = medicaments.parId(cle.medicamentId) ?: return@launch
-                val dose = ordonnances.enVigueur(cle.medicamentId, cle.date)
-                    ?.doses
-                    ?.firstOrNull { it.moment == cle.moment }
-                    ?.dose
-                    ?: return@launch
-
-                notifications.posterRappel(cle, medicament, dose, critique)
-                rafraichirWidget()
-
-                val intervalle = preferences.instantane().intervalleRelanceMinutes
-                programmateur.programmer(
-                    cle = cle,
-                    quand = horloge.maintenant().plusMinutes(intervalle.toLong()),
-                    critique = critique,
-                )
+                declencherRappel(cle, critique, phase)
             } catch (erreur: Throwable) {
                 // Une exception non rattrapée ici tuerait le processus depuis
                 // l'arrière-plan : on la rend visible sans faire tomber l'app.

@@ -99,4 +99,52 @@ class NotificationsTest {
         val postee = shadowOf(gestionnaire).activeNotifications.first { it.id == cle.codeRequete() }
         assertEquals(CANAL_CRITIQUES, postee.notification.channelId)
     }
+
+    @Test
+    fun `le canal des rappels a venir est silencieux`() {
+        val canal = gestionnaire.getNotificationChannel(CANAL_A_VENIR)
+
+        assertEquals(NotificationManager.IMPORTANCE_LOW, canal.importance)
+    }
+
+    @Test
+    fun `un preavis passe par le canal silencieux sous l identifiant de sa cle`() {
+        val cle = CleRappel(7, LocalDate.of(2026, 1, 5), Moment.MATIN)
+
+        notifications.posterPreavis(cle, medicament(), dose = 1.0)
+
+        val postee = shadowOf(gestionnaire).activeNotifications.first { it.id == cle.codeRequete() }
+        assertEquals(CANAL_A_VENIR, postee.notification.channelId)
+    }
+
+    @Test
+    fun `un preavis ne propose que l action pris`() {
+        val cle = CleRappel(7, LocalDate.of(2026, 1, 5), Moment.MATIN)
+
+        notifications.posterPreavis(cle, medicament(), dose = 1.0)
+
+        val postee = shadowOf(gestionnaire).activeNotifications.first { it.id == cle.codeRequete() }
+        assertEquals(listOf("Pris"), postee.notification.actions.map { it.title.toString() })
+    }
+
+    @Test
+    fun `le preavis d un critique ne declenche ni plein ecran ni notification permanente`() {
+        val cle = CleRappel(7, LocalDate.of(2026, 1, 5), Moment.MATIN)
+
+        notifications.posterPreavis(cle, medicament(critique = true), dose = 1.0)
+
+        val postee = shadowOf(gestionnaire).activeNotifications.first { it.id == cle.codeRequete() }
+        assertEquals(null, postee.notification.fullScreenIntent)
+        assertEquals(0, postee.notification.flags and android.app.Notification.FLAG_ONGOING_EVENT)
+    }
+
+    @Test
+    fun `le resume de groupe d un preavis reste silencieux`() {
+        val cle = CleRappel(7, LocalDate.of(2026, 1, 5), Moment.MATIN)
+
+        notifications.posterPreavis(cle, medicament(), dose = 1.0)
+
+        val resume = shadowOf(gestionnaire).activeNotifications.first { it.id != cle.codeRequete() }
+        assertEquals(CANAL_A_VENIR, resume.notification.channelId)
+    }
 }

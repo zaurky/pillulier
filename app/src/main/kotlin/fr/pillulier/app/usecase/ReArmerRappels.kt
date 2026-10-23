@@ -5,6 +5,7 @@ import fr.pillulier.app.data.DepotMedicaments
 import fr.pillulier.app.data.DepotMoments
 import fr.pillulier.app.data.DepotOrdonnances
 import fr.pillulier.app.rappels.ProgrammateurAlarmes
+import fr.pillulier.app.rappels.premierDeclenchement
 import fr.pillulier.app.temps.Horloge
 import fr.pillulier.domain.CleRappel
 import fr.pillulier.domain.Moment
@@ -54,12 +55,12 @@ class ReArmerRappels @Inject constructor(
             prisesAttendues(jour, toutes, heures)
                 .filter { statut(it, dejaPrises, maintenant) != StatutPrise.PRISE }
                 .forEach { prise ->
+                    val (quand, phase) = premierDeclenchement(prise.heure, maintenant)
                     programmateur.programmer(
                         cle = CleRappel(prise.medicamentId, jour, prise.moment),
-                        // Une prise du jour déjà due mais sans réponse repart
-                        // tout de suite plutôt que d'être perdue.
-                        quand = if (prise.heure.isAfter(maintenant)) prise.heure else maintenant.plusMinutes(1),
+                        quand = quand,
                         critique = prise.medicamentId in critiques,
+                        phase = phase,
                     )
                 }
         }

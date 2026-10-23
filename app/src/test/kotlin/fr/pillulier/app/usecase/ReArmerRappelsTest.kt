@@ -9,6 +9,7 @@ import fr.pillulier.app.data.DepotMoments
 import fr.pillulier.app.data.DepotOrdonnances
 import fr.pillulier.app.data.db.PillulierDatabase
 import fr.pillulier.app.data.db.momentsParDefaut
+import fr.pillulier.app.rappels.Phase
 import fr.pillulier.app.rappels.ProgrammateurAlarmes
 import fr.pillulier.domain.CleRappel
 import fr.pillulier.domain.DosePrescrite
@@ -30,13 +31,18 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class ProgrammateurEspion : ProgrammateurAlarmes {
-    data class Programmation(val cle: CleRappel, val quand: LocalDateTime, val critique: Boolean)
+    data class Programmation(
+        val cle: CleRappel,
+        val quand: LocalDateTime,
+        val critique: Boolean,
+        val phase: Phase = Phase.SONNERIE,
+    )
 
     val programmees = mutableListOf<Programmation>()
     val annulees = mutableListOf<CleRappel>()
 
-    override fun programmer(cle: CleRappel, quand: LocalDateTime, critique: Boolean) {
-        programmees += Programmation(cle, quand, critique)
+    override fun programmer(cle: CleRappel, quand: LocalDateTime, critique: Boolean, phase: Phase) {
+        programmees += Programmation(cle, quand, critique, phase)
     }
 
     override fun annuler(cle: CleRappel) {
@@ -114,19 +120,32 @@ class ReArmerRappelsTest {
     }
 
     @Test
-    fun `la fenetre couvre trois jours`() = runTest {
+    fun `la fenetre couvre trois jours avec un preavis trente minutes avant chaque prise`() = runTest {
         medicamentPlanifie("Levothyrox")
 
         reArmer()
 
         assertEquals(
             listOf(
-                LocalDateTime.of(2026, 1, 5, 8, 0),
-                LocalDateTime.of(2026, 1, 6, 8, 0),
-                LocalDateTime.of(2026, 1, 7, 8, 0),
+                LocalDateTime.of(2026, 1, 5, 7, 30),
+                LocalDateTime.of(2026, 1, 6, 7, 30),
+                LocalDateTime.of(2026, 1, 7, 7, 30),
             ),
             programmateur.programmees.map { it.quand },
         )
+        assertTrue(programmateur.programmees.all { it.phase == Phase.PREAVIS })
+    }
+
+    @Test
+    fun `une prise dans moins de trente minutes recoit son preavis tout de suite`() = runTest {
+        horloge.avancerA(LocalDateTime.of(2026, 1, 5, 7, 45))
+        medicamentPlanifie("Levothyrox")
+
+        reArmer()
+
+        val duJour = programmateur.programmees.first { it.cle.date == LocalDate.of(2026, 1, 5) }
+        assertEquals(LocalDateTime.of(2026, 1, 5, 7, 46), duJour.quand)
+        assertEquals(Phase.PREAVIS, duJour.phase)
     }
 
     @Test
@@ -152,16 +171,15 @@ class ReArmerRappelsTest {
     }
 
     @Test
-    fun `une prise du jour deja passee est reprogrammee juste apres maintenant`() = runTest {
+    fun `une prise du jour deja passee sonne juste apres maintenant`() = runTest {
         horloge.avancerA(LocalDateTime.of(2026, 1, 5, 9, 30))
         medicamentPlanifie("Levothyrox")
 
         reArmer()
 
-        assertEquals(
-            LocalDateTime.of(2026, 1, 5, 9, 31),
-            programmateur.programmees.first { it.cle.date == LocalDate.of(2026, 1, 5) }.quand,
-        )
+        val duJour = programmateur.programmees.first { it.cle.date == LocalDate.of(2026, 1, 5) }
+        assertEquals(LocalDateTime.of(2026, 1, 5, 9, 31), duJour.quand)
+        assertEquals(Phase.SONNERIE, duJour.phase)
     }
 
     @Test

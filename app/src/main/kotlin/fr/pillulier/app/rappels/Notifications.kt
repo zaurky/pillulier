@@ -18,6 +18,7 @@ import javax.inject.Inject
 
 const val CANAL_RAPPELS = "rappels"
 const val CANAL_CRITIQUES = "critiques"
+const val CANAL_A_VENIR = "a_venir"
 
 const val ACTION_PRIS = "fr.pillulier.app.PRIS"
 const val ACTION_PLUS_TARD = "fr.pillulier.app.PLUS_TARD"
@@ -38,6 +39,11 @@ class Notifications @Inject constructor(private val contexte: Context) {
             NotificationChannel(CANAL_CRITIQUES, "Prises critiques", NotificationManager.IMPORTANCE_HIGH).apply {
                 setBypassDnd(true)
             },
+        )
+        // Un canal neuf plutôt que les rappels rendus muets : Android ignore
+        // tout changement d'importance d'un canal déjà créé.
+        gestionnaire.createNotificationChannel(
+            NotificationChannel(CANAL_A_VENIR, "Rappels à venir", NotificationManager.IMPORTANCE_LOW),
         )
     }
 
@@ -63,7 +69,26 @@ class Notifications @Inject constructor(private val contexte: Context) {
             .build()
 
         gestionnaire.notify(cle.codeRequete(), notification)
-        gestionnaire.notify(BASE_GROUPE + cle.moment.ordinal, resumeDeGroupe(cle.moment))
+        gestionnaire.notify(BASE_GROUPE + cle.moment.ordinal, resumeDeGroupe(cle.moment, CANAL_RAPPELS))
+    }
+
+    /**
+     * Annonce silencieuse d'une prise à venir, sous le même identifiant que
+     * son rappel : la sonnerie la remplacera à l'heure. Seul *Pris* y figure,
+     * repousser une prise qui n'a pas encore sonné n'ayant pas de sens.
+     */
+    fun posterPreavis(cle: CleRappel, medicament: Medicament, dose: Double) {
+        val notification = NotificationCompat.Builder(contexte, CANAL_A_VENIR)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle("${medicament.nom} ${medicament.dosage}")
+            .setContentText("${libelleMoment(cle.moment)} — ${libelleDoseComplete(dose, medicament.forme)}")
+            .setContentIntent(intentOuvertureApp())
+            .setGroup(cleGroupe(cle.moment))
+            .addAction(0, "Pris", intentAction(ACTION_PRIS, cle, dose))
+            .build()
+
+        gestionnaire.notify(cle.codeRequete(), notification)
+        gestionnaire.notify(BASE_GROUPE + cle.moment.ordinal, resumeDeGroupe(cle.moment, CANAL_A_VENIR))
     }
 
     fun retirer(cle: CleRappel) {
@@ -75,7 +100,7 @@ class Notifications @Inject constructor(private val contexte: Context) {
         gestionnaire.cancel(BASE_GROUPE + moment.ordinal)
     }
 
-    private fun resumeDeGroupe(moment: Moment) = NotificationCompat.Builder(contexte, CANAL_RAPPELS)
+    private fun resumeDeGroupe(moment: Moment, canal: String) = NotificationCompat.Builder(contexte, canal)
         .setSmallIcon(R.drawable.ic_notification)
         .setContentTitle(libelleMoment(moment))
         .setGroup(cleGroupe(moment))
