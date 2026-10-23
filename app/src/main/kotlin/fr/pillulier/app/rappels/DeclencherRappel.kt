@@ -1,5 +1,6 @@
 package fr.pillulier.app.rappels
 
+import fr.pillulier.app.data.DepotEvenements
 import fr.pillulier.app.data.DepotMedicaments
 import fr.pillulier.app.data.DepotMoments
 import fr.pillulier.app.data.DepotOrdonnances
@@ -20,6 +21,7 @@ class DeclencherRappel @Inject constructor(
     private val medicaments: DepotMedicaments,
     private val ordonnances: DepotOrdonnances,
     private val moments: DepotMoments,
+    private val evenements: DepotEvenements,
     private val preferences: DepotPreferences,
     private val notifications: Notifications,
     private val programmateur: ProgrammateurAlarmes,
@@ -40,6 +42,15 @@ class DeclencherRappel @Inject constructor(
         // le préavis d'une prise juste après minuit tombe la veille.
         val aujourdhui = horloge.aujourdhui()
         if (cle.date != aujourdhui && !(preavis && cle.date == aujourdhui.plusDays(1))) return
+
+        // L'alarme qui nous réveille peut être partie juste avant que la prise
+        // soit cochée : `annuler` n'a aucune prise sur un déclenchement en vol.
+        // C'est le journal qui tranche, jamais l'alarme — sinon la notification
+        // revient et sa relance se perpétue toute la journée.
+        val dejaPrise = evenements.entre(cle.date, cle.date).any {
+            it.medicamentId == cle.medicamentId && it.moment == cle.moment
+        }
+        if (dejaPrise) return
 
         val medicament = medicaments.parId(cle.medicamentId) ?: return
         val dose = ordonnances.enVigueur(cle.medicamentId, cle.date)
