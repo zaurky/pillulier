@@ -18,9 +18,11 @@ import fr.pillulier.domain.CleRappel
 import fr.pillulier.domain.Medicament
 import fr.pillulier.domain.TypeOrdonnance
 import fr.pillulier.domain.enVigueur
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -31,6 +33,7 @@ data class EtatAujourdhui(
     val aLaDemande: List<Medicament> = emptyList(),
 )
 
+@OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class AujourdhuiViewModel @Inject constructor(
     observerJournee: ObserverJournee,
@@ -44,31 +47,35 @@ class AujourdhuiViewModel @Inject constructor(
     private val rafraichirWidget: RafraichirWidget,
 ) : ViewModel() {
 
-    val etat: StateFlow<EtatAujourdhui> = combine(
-        observerJournee(horloge.aujourdhui()),
-        observerAlertes(),
-        // Les archivés doivent quitter cette liste : leur ordonnance est close,
-        // donc `enVigueur` retombe à jamais sur la dernière version connue —
-        // encore « à la demande » — et le médicament retiré resterait proposé.
-        medicaments.observerActifs(),
-        ordonnances.observerToutes(),
-    ) { lignes, alertes, actifs, toutesOrdonnances ->
-        // Les médicaments à la demande n'ont aucune prise planifiée : ils sont
-        // proposés à part, pour un enregistrement ponctuel.
-        val aujourdhui = horloge.aujourdhui()
-        val idsALaDemande = actifs
-            .map { it.id }
-            .filter { id ->
-                toutesOrdonnances.enVigueur(id, aujourdhui)?.ordonnance?.type ==
-                    TypeOrdonnance.A_LA_DEMANDE
-            }
-            .toSet()
+    // La date se relit au fil de l'eau, elle ne se grave pas à la construction :
+    // un ViewModel vit aussi longtemps que son activité, et l'app laissée
+    // ouverte la nuit affichait encore la veille au matin.
+    val etat: StateFlow<EtatAujourdhui> = horloge.jours().flatMapLatest { aujourdhui ->
+        combine(
+            observerJournee(aujourdhui),
+            observerAlertes(),
+            // Les archivés doivent quitter cette liste : leur ordonnance est close,
+            // donc `enVigueur` retombe à jamais sur la dernière version connue —
+            // encore « à la demande » — et le médicament retiré resterait proposé.
+            medicaments.observerActifs(),
+            ordonnances.observerToutes(),
+        ) { lignes, alertes, actifs, toutesOrdonnances ->
+            // Les médicaments à la demande n'ont aucune prise planifiée : ils
+            // sont proposés à part, pour un enregistrement ponctuel.
+            val idsALaDemande = actifs
+                .map { it.id }
+                .filter { id ->
+                    toutesOrdonnances.enVigueur(id, aujourdhui)?.ordonnance?.type ==
+                        TypeOrdonnance.A_LA_DEMANDE
+                }
+                .toSet()
 
-        EtatAujourdhui(
-            lignes = lignes,
-            alertes = alertes,
-            aLaDemande = actifs.filter { it.id in idsALaDemande },
-        )
+            EtatAujourdhui(
+                lignes = lignes,
+                alertes = alertes,
+                aLaDemande = actifs.filter { it.id in idsALaDemande },
+            )
+        }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), EtatAujourdhui())
 
     fun cocher(ligne: LigneJournee) = viewModelScope.launch {

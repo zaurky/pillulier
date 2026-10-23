@@ -25,6 +25,7 @@ import fr.pillulier.app.usecase.ProgrammateurEspion
 import fr.pillulier.app.usecase.ReArmerRappels
 import fr.pillulier.app.widget.RafraichirWidget
 import fr.pillulier.domain.CleRappel
+import fr.pillulier.domain.DosePrescrite
 import fr.pillulier.domain.Forme
 import fr.pillulier.domain.Medicament
 import fr.pillulier.domain.Moment
@@ -37,6 +38,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -266,5 +269,38 @@ class AujourdhuiViewModelTest {
             vue.etat.drop(1).first().aLaDemande.map { it.nom },
             "un medicament archive ne doit plus etre propose a la demande",
         )
+    }
+
+    @Test
+    fun `l ecran du jour passe au lendemain a minuit sans etre reconstruit`() = runTest {
+        insererInsuline()
+        ordonnances.enregistrerVersion(
+            medicamentId = 1,
+            ordonnance = Ordonnance(
+                id = 0,
+                medicamentId = 1,
+                type = TypeOrdonnance.PLANIFIEE,
+                rythme = Rythme.TousLesJours,
+                dateDebut = LocalDate.of(2026, 1, 1),
+                dateFin = null,
+                dateAncrage = LocalDate.of(2026, 1, 1),
+            ),
+            doses = listOf(DosePrescrite(Moment.MATIN, 1.0)),
+            dateEffet = LocalDate.of(2026, 1, 1),
+        )
+        vue.cocher(ligneInsuline()).join()
+        // Room publie depuis ses propres fils : on attend en temps réel, pas
+        // dans le temps virtuel du test.
+        suspend fun attendre(statut: StatutPrise) = withContext(Dispatchers.Default) {
+            withTimeout(5_000) {
+                vue.etat.first { etat -> etat.lignes.any { it.statut == statut } }
+            }
+        }
+        attendre(StatutPrise.PRISE)
+
+        // L'app reste ouverte toute la nuit : même ViewModel, horloge avancée.
+        horloge.avancerA(LocalDateTime.of(2026, 1, 6, 8, 30))
+
+        attendre(StatutPrise.EN_RETARD)
     }
 }
