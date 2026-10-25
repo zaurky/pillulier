@@ -14,10 +14,10 @@ interface ProgrammateurAlarmes {
 
 /**
  * Une prise s'annonce en silence avant son heure, pour être cochée d'avance,
- * puis sonne à l'heure. Les deux phases partagent la clé, donc une seule
- * alarme : le préavis programme lui-même la sonnerie.
+ * sonne à l'heure, puis relance tant qu'elle n'est pas cochée. Les phases
+ * partagent la clé, donc une seule alarme : chacune programme la suivante.
  */
-enum class Phase { PREAVIS, SONNERIE }
+enum class Phase { PREAVIS, SONNERIE, RELANCE }
 
 const val PREAVIS_MINUTES = 30L
 

@@ -138,7 +138,21 @@ class DeclencherRappelTest {
 
         assertEquals(CANAL_RAPPELS, canalPoste(cle))
         assertEquals(
-            listOf(ProgrammateurEspion.Programmation(cle, LocalDateTime.of(2026, 1, 5, 8, 15), false, Phase.SONNERIE)),
+            listOf(ProgrammateurEspion.Programmation(cle, LocalDateTime.of(2026, 1, 5, 8, 15), false, Phase.RELANCE)),
+            programmateur.programmees,
+        )
+    }
+
+    @Test
+    fun `une relance poste le rappel sonore et programme la relance suivante`() = runTest {
+        horloge.avancerA(LocalDateTime.of(2026, 1, 5, 8, 15))
+        val cle = CleRappel(medicamentDuMatin(), LocalDate.of(2026, 1, 5), Moment.MATIN)
+
+        declencher(cle, critique = false, phase = Phase.RELANCE)
+
+        assertEquals(CANAL_RAPPELS, canalPoste(cle))
+        assertEquals(
+            listOf(ProgrammateurEspion.Programmation(cle, LocalDateTime.of(2026, 1, 5, 8, 30), false, Phase.RELANCE)),
             programmateur.programmees,
         )
     }

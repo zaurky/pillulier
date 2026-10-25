@@ -14,8 +14,9 @@ import javax.inject.Inject
 /**
  * Ce que fait une alarme de rappel quand elle se déclenche. Le préavis poste
  * en silence et arme la sonnerie à l'heure de la prise ; la sonnerie poste le
- * rappel sonore et arme la relance suivante. La chaîne s'interrompt quand la
- * prise est enregistrée ou à la clôture de la journée, qui annule la clé.
+ * rappel sonore, plein écran pour un critique, et arme la relance suivante.
+ * La chaîne s'interrompt quand la prise est enregistrée ou à la clôture de la
+ * journée, qui annule la clé.
  */
 class DeclencherRappel @Inject constructor(
     private val medicaments: DepotMedicaments,
@@ -64,6 +65,11 @@ class DeclencherRappel @Inject constructor(
             rafraichirWidget()
             programmateur.programmer(cle = cle, quand = heure, critique = critique, phase = Phase.SONNERIE)
         } else {
+            // Android n'ouvre l'écran plein écran que pour une notification
+            // neuve, jamais pour la mise à jour d'une notification affichée :
+            // posté par-dessus le préavis, le rappel critique sonnait sans
+            // ouvrir l'alarme. Les relances, elles, restent des mises à jour.
+            if (phase != Phase.RELANCE) notifications.retirer(cle)
             notifications.posterRappel(cle, medicament, dose, critique)
             rafraichirWidget()
             val intervalle = preferences.instantane().intervalleRelanceMinutes
@@ -71,7 +77,7 @@ class DeclencherRappel @Inject constructor(
                 cle = cle,
                 quand = maintenant.plusMinutes(intervalle.toLong()),
                 critique = critique,
-                phase = Phase.SONNERIE,
+                phase = Phase.RELANCE,
             )
         }
     }
